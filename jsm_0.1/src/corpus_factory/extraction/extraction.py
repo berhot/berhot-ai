@@ -18,10 +18,19 @@ from src.corpus_factory.extraction.dispatcher import (
 from src.corpus_factory.extraction.loader import (
     iter_tasks,
     load_ingestion_manifest,
+    read_checksum,
+)
+from src.corpus_factory.extraction.result import (
+    ExtractionStatus,
 )
 from src.corpus_factory.intake.hashing import (
+    is_valid_sha256,
     sha256_file,
 )
+
+
+MANIFEST_SCHEMA_VERSION = "1.0.0"
+MANIFEST_RECORD_TYPE = "extraction_manifest"
 
 
 def utc_now() -> str:
@@ -70,20 +79,19 @@ def completed_ingestions(
             continue
 
         try:
-            expected = (
-                checksum_path
-                .read_text(
-                    encoding="ascii"
+            expected_hash = (
+                read_checksum(
+                    checksum_path
                 )
-                .strip()
-                .split()[0]
+            )
+
+            actual_hash = sha256_file(
+                manifest_path
             )
 
             if (
-                sha256_file(
-                    manifest_path
-                )
-                != expected
+                actual_hash
+                != expected_hash
             ):
                 continue
 
@@ -93,11 +101,35 @@ def completed_ingestions(
                 )
             )
 
+            if not isinstance(
+                manifest,
+                dict,
+            ):
+                continue
+
+            if (
+                manifest.get(
+                    "schema_version"
+                )
+                != MANIFEST_SCHEMA_VERSION
+            ):
+                continue
+
             if (
                 manifest.get(
                     "record_type"
                 )
-                != "extraction_manifest"
+                != MANIFEST_RECORD_TYPE
+            ):
+                continue
+
+            extraction_id = manifest.get(
+                "extraction_id"
+            )
+
+            if (
+                extraction_id
+                != directory.name
             ):
                 continue
 
@@ -128,6 +160,9 @@ def completed_ingestions(
                     ingestion_hash,
                     str,
                 )
+                and is_valid_sha256(
+                    ingestion_hash
+                )
             ):
                 completed.add(
                     (
@@ -140,12 +175,31 @@ def completed_ingestions(
             OSError,
             UnicodeError,
             ValueError,
-            KeyError,
-            TypeError,
+            json.JSONDecodeError,
         ):
             continue
 
     return completed
+
+
+def write_checksum(
+    path: Path,
+    digest: str,
+) -> None:
+    with path.open(
+        "x",
+        encoding="ascii",
+    ) as file:
+        file.write(
+            digest
+            + "\n"
+        )
+
+        file.flush()
+
+        os.fsync(
+            file.fileno()
+        )
 
 
 def extract_ingestion(
@@ -167,6 +221,14 @@ def extract_ingestion(
         / extraction_id
     )
 
+    if (
+        destination.exists()
+        or destination.is_symlink()
+    ):
+        raise FileExistsError(
+            destination
+        )
+
     staging = Path(
         tempfile.mkdtemp(
             prefix=".pending-",
@@ -187,10 +249,16 @@ def extract_ingestion(
             / "documents.jsonl"
         )
 
-        extracted = 0
-        failed = 0
-        total_text_bytes = 0
-        total_characters = 0
+        summary = {
+            "total": 0,
+            "extracted": 0,
+            "unsupported": 0,
+            "review_required": 0,
+            "failed": 0,
+            "source_bytes": 0,
+            "text_bytes": 0,
+            "characters": 0,
+        }
 
         tasks = iter_tasks(
             ingestion_dir=(
@@ -220,6 +288,16 @@ def extract_ingestion(
                     result
                 )
 
+                record[
+                    "status"
+                ] = result.status.value
+
+                record[
+                    "warnings"
+                ] = list(
+                    result.warnings
+                )
+
                 records.write(
                     json.dumps(
                         record,
@@ -233,18 +311,34 @@ def extract_ingestion(
                     + "\n"
                 )
 
+                summary[
+                    "total"
+                ] += 1
+
+                summary[
+                    "source_bytes"
+                ] += (
+                    result.source_size_bytes
+                )
+
                 if (
                     result.status
-                    == "extracted"
+                    is ExtractionStatus.EXTRACTED
                 ):
-                    extracted += 1
+                    summary[
+                        "extracted"
+                    ] += 1
 
-                    total_text_bytes += (
+                    summary[
+                        "text_bytes"
+                    ] += (
                         result.text_size_bytes
                         or 0
                     )
 
-                    total_characters += (
+                    summary[
+                        "characters"
+                    ] += (
                         result.character_count
                         or 0
                     )
@@ -254,8 +348,38 @@ def extract_ingestion(
                         f"{result.original_filename}"
                     )
 
+                elif (
+                    result.status
+                    is ExtractionStatus.UNSUPPORTED
+                ):
+                    summary[
+                        "unsupported"
+                    ] += 1
+
+                    print(
+                        f"UNSUPPORTED: "
+                        f"{result.original_filename}"
+                        f" — {result.error}"
+                    )
+
+                elif (
+                    result.status
+                    is ExtractionStatus.REVIEW_REQUIRED
+                ):
+                    summary[
+                        "review_required"
+                    ] += 1
+
+                    print(
+                        f"REVIEW REQUIRED: "
+                        f"{result.original_filename}"
+                        f" — {result.error}"
+                    )
+
                 else:
-                    failed += 1
+                    summary[
+                        "failed"
+                    ] += 1
 
                     print(
                         f"FAILED: "
@@ -269,23 +393,39 @@ def extract_ingestion(
                 records.fileno()
             )
 
+        if (
+            summary["total"]
+            == 0
+        ):
+            raise ValueError(
+                "Extraction input contains "
+                "no documents"
+            )
+
         records_hash = sha256_file(
             records_path
         )
 
-        (
-            staging
-            / "documents.jsonl.sha256"
-        ).write_text(
-            records_hash
-            + "\n",
-            encoding="ascii",
+        records_size = (
+            records_path
+            .stat()
+            .st_size
+        )
+
+        write_checksum(
+            (
+                staging
+                / "documents.jsonl.sha256"
+            ),
+            records_hash,
         )
 
         manifest = {
-            "schema_version": "1.0.0",
+            "schema_version": (
+                MANIFEST_SCHEMA_VERSION
+            ),
             "record_type": (
-                "extraction_manifest"
+                MANIFEST_RECORD_TYPE
             ),
             "extraction_id": (
                 extraction_id
@@ -314,22 +454,17 @@ def extract_ingestion(
                     "sha256": (
                         records_hash
                     ),
+                    "records": (
+                        summary[
+                            "total"
+                        ]
+                    ),
+                    "size_bytes": (
+                        records_size
+                    ),
                 },
             },
-            "summary": {
-                "total": (
-                    extracted
-                    + failed
-                ),
-                "extracted": extracted,
-                "failed": failed,
-                "total_text_bytes": (
-                    total_text_bytes
-                ),
-                "total_characters": (
-                    total_characters
-                ),
-            },
+            "summary": summary,
             "immutability": {
                 "source_modified": False,
                 "append_only": True,
@@ -369,17 +504,19 @@ def extract_ingestion(
                 output.fileno()
             )
 
-        manifest_hash = hashlib.sha256(
-            encoded
-        ).hexdigest()
+        manifest_hash = (
+            hashlib.sha256(
+                encoded
+            )
+            .hexdigest()
+        )
 
-        (
-            staging
-            / "manifest.json.sha256"
-        ).write_text(
-            manifest_hash
-            + "\n",
-            encoding="ascii",
+        write_checksum(
+            (
+                staging
+                / "manifest.json.sha256"
+            ),
+            manifest_hash,
         )
 
         os.rename(
@@ -388,7 +525,10 @@ def extract_ingestion(
         )
 
     except Exception:
-        if staging.exists():
+        if (
+            staging.exists()
+            and not staging.is_symlink()
+        ):
             shutil.rmtree(
                 staging
             )
@@ -438,6 +578,12 @@ def extraction(
             "ingestion_"
         )
     )
+
+    if not ingestion_dirs:
+        print(
+            "No ingestion data found."
+        )
+        return
 
     for ingestion_dir in ingestion_dirs:
         (

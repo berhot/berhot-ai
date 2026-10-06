@@ -1,5 +1,9 @@
 from pathlib import Path
 
+from src.corpus_factory.extraction.errors import (
+    ExtractionReviewRequired,
+)
+
 
 CHARACTER_CHUNK_SIZE = (
     1024 * 1024
@@ -13,6 +17,7 @@ def extract_text_file(
     encoding: str,
 ) -> int:
     characters = 0
+    has_content = False
 
     with source_path.open(
         "r",
@@ -40,5 +45,17 @@ def extract_text_file(
                 characters += len(
                     text
                 )
+
+                if (
+                    not has_content
+                    and not text.isspace()
+                ):
+                    has_content = True
+
+    if not has_content:
+        raise ExtractionReviewRequired(
+            "Extracted text is empty "
+            "or whitespace-only"
+        )
 
     return characters

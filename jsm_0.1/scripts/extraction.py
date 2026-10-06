@@ -1,4 +1,3 @@
-
 from paths import (
     EXTRACTED_DIR,
     RAW_STORAGE_DIR,

@@ -1,4 +1,3 @@
-
 from collections.abc import (
     Iterable,
     Iterator,
@@ -58,11 +57,13 @@ def dispatch(
             except StopIteration:
                 break
 
+            future = executor.submit(
+                process_task,
+                task,
+            )
+
             pending.add(
-                executor.submit(
-                    process_task,
-                    task,
-                )
+                future
             )
 
         while pending:
@@ -84,9 +85,11 @@ def dispatch(
                 except StopIteration:
                     continue
 
+                future = executor.submit(
+                    process_task,
+                    task,
+                )
+
                 pending.add(
-                    executor.submit(
-                        process_task,
-                        task,
-                    )
+                    future
                 )

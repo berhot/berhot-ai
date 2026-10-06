@@ -41,7 +41,10 @@ def read_checksum(
             f"{checksum_path}"
         )
 
-    checksum = text.split()[0]
+    checksum = (
+        text
+        .split()[0]
+    )
 
     if not is_valid_sha256(
         checksum
@@ -81,7 +84,10 @@ def load_ingestion_manifest(
         checksum_path
     )
 
-    if actual_hash != expected_hash:
+    if (
+        actual_hash
+        != expected_hash
+    ):
         raise ValueError(
             f"Ingestion manifest checksum "
             f"mismatch: {manifest_path}"
@@ -150,7 +156,10 @@ def load_ingestion_manifest(
             "no valid ingestion_id"
         )
 
-    if ingestion_id != ingestion_dir.name:
+    if (
+        ingestion_id
+        != ingestion_dir.name
+    ):
         raise ValueError(
             "Ingestion ID does not match "
             "directory name"
@@ -160,13 +169,16 @@ def load_ingestion_manifest(
         "documents"
     )
 
-    if not isinstance(
-        documents,
-        list,
+    if (
+        not isinstance(
+            documents,
+            list,
+        )
+        or not documents
     ):
         raise ValueError(
-            "Ingestion documents "
-            "must be a list"
+            "Ingestion documents must "
+            "be a non-empty list"
         )
 
     return (
@@ -236,6 +248,10 @@ def iter_tasks(
 
         source_size_bytes = document.get(
             "size_bytes"
+        )
+
+        detected_mime_type = document.get(
+            "detected_mime_type"
         )
 
         encoding = document.get(
@@ -325,6 +341,19 @@ def iter_tasks(
             )
 
         if (
+            detected_mime_type
+            is not None
+            and not isinstance(
+                detected_mime_type,
+                str,
+            )
+        ):
+            raise ValueError(
+                f"Document {document_id} "
+                f"has invalid MIME type"
+            )
+
+        if (
             encoding is not None
             and not isinstance(
                 encoding,
@@ -367,6 +396,9 @@ def iter_tasks(
             ),
             source_size_bytes=(
                 source_size_bytes
+            ),
+            detected_mime_type=(
+                detected_mime_type
             ),
             encoding=encoding,
             output_path=output_path,

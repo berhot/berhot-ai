@@ -1,5 +1,10 @@
 from pathlib import Path
 
+from src.corpus_factory.extraction.errors import (
+    ExtractionReviewRequired,
+)
+
+
 def extract_pdf(
     *,
     source_path: Path,
@@ -19,6 +24,7 @@ def extract_pdf(
     )
 
     characters = 0
+    has_content = False
 
     with output_path.open(
         "x",
@@ -48,5 +54,18 @@ def extract_pdf(
             characters += len(
                 text
             )
+
+            if (
+                not has_content
+                and text
+                and not text.isspace()
+            ):
+                has_content = True
+
+    if not has_content:
+        raise ExtractionReviewRequired(
+            "PDF has no embedded text "
+            "and may require OCR"
+        )
 
     return characters
