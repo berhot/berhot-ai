@@ -1,0 +1,9 @@
+Intake
+  ↓
+Inspection
+  ↓
+Provenance
+  ↓
+Ingestion
+  ↓
+Extraction
