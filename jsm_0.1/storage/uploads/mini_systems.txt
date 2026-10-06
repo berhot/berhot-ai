@@ -1,0 +1,1 @@
+Computers move data through memory, processors, storage, and networks. Fast systems reduce unnecessary work and measure the real bottleneck. Reliable systems also plan for failure, recovery, and clear operational limits.

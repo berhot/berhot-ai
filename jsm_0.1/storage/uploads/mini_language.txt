@@ -1,0 +1,1 @@
+Language models learn statistical patterns from sequences of tokens. Attention lets each position combine relevant earlier information. Training predicts the next token, while generation repeatedly appends a selected prediction.

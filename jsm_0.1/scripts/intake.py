@@ -1,14 +1,11 @@
-from paths import UPLOADS_DIR
-
-from src.corpus_factory.intake.intake import read_uploads
+from paths import (
+    BATCHES_DIR,
+    UPLOADS_DIR,
+)
+from src.corpus_factory.intake.intake import (intake)
 
 if __name__ == "__main__":
-    sources = read_uploads(UPLOADS_DIR)
-
-    print("Uploads directory:")
-    print(UPLOADS_DIR)
-
-    print("Sources:")
-    print(sources)
-
-    
+    intake(
+        uploads_dir=UPLOADS_DIR,
+        batches_dir=BATCHES_DIR,
+    )

@@ -1,0 +1,1 @@
+Software grows through small changes that preserve working behavior. Tests describe important expectations while readable names explain intent. A useful review looks for correctness, security, performance, and missing evidence.
