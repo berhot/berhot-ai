@@ -477,6 +477,16 @@ def ingest_batch(
                     "source_relative_path": (
                         relative_path
                     ),
+                    "detected_mime_type": (
+                        artifact.get(
+                            "detected_mime_type"
+                        )
+                    ),
+                    "encoding": (
+                        artifact.get(
+                            "encoding"
+                        )
+                    ),
                     "stored_relative_path": (
                         (
                             Path(
