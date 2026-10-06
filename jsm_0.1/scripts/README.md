@@ -1,6 +1,6 @@
-python -m scripts.intake
-python -m scripts.inspection
-python -m scripts.provenance
+python3 -m scripts.intake
+python3 -m scripts.inspection
+python3 -m scripts.provenance
 
 *** If it says:
 BLOCK — review_required
@@ -8,18 +8,22 @@ python3 -m scripts.provenance_review <batch-id> allowed "Permission verified"
 
 <!-- python -m scripts.provenance_review ali-hassan-20261004T124557Z-7d637fa5 allowed owned_data -->
 
-python -m scripts.ingestion
+python3 -m scripts.ingestion
 
-python -m scripts.extraction
+python3 -m scripts.raw_exact_deduplication
+python3 -m scripts.extraction
 
-python -m scripts.cleaning
-python -m scripts.normalization
-python -m scripts.filtering
-python -m scripts.deduplication
+python3 -m scripts.cleaning
+python3 -m scripts.normalization
+python3 -m scripts.filtering
+python3 -m scripts.deduplication
 
-python -m scripts.dataset_building
+python3 -m scripts.language_classification
+python3 -m scripts.arabic_variety_classification
 
-python -m scripts.tokenizer_training
+python3 -m scripts.dataset_building
+
+python3 -m scripts.tokenizer_training
 
 for test : 
 python -c "from paths import TOKENIZER_PATH; from src.tokenization.tokenizer import Tokenizer; t=Tokenizer.load(TOKENIZER_PATH); text='مرحبا بالعالم'; ids=t.encode(text, add_bos=True, add_eos=True); print(ids); print(t.decode(ids)); assert t.decode(ids)==text; print('PASS')"

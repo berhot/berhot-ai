@@ -131,6 +131,9 @@ def process_task(
         )
 
         return ExtractionResult(
+            raw_exact_id=(
+                task.raw_exact_id
+            ),
             ingestion_id=(
                 task.ingestion_id
             ),
@@ -180,6 +183,9 @@ def process_task(
             temporary_path.unlink()
 
         return ExtractionResult(
+            raw_exact_id=(
+                task.raw_exact_id
+            ),
             ingestion_id=(
                 task.ingestion_id
             ),
@@ -223,6 +229,9 @@ def process_task(
             temporary_path.unlink()
 
         return ExtractionResult(
+            raw_exact_id=(
+                task.raw_exact_id
+            ),
             ingestion_id=(
                 task.ingestion_id
             ),
@@ -266,6 +275,9 @@ def process_task(
             temporary_path.unlink()
 
         return ExtractionResult(
+            raw_exact_id=(
+                task.raw_exact_id
+            ),
             ingestion_id=(
                 task.ingestion_id
             ),

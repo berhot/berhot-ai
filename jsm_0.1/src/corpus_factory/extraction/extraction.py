@@ -12,12 +12,18 @@ from datetime import (
 from pathlib import Path
 from uuid import uuid4
 
+from src.corpus_factory.deduplication.raw_exact.index import (
+    extraction_is_indexed,
+    mark_extraction_indexed,
+    open_index,
+    register_extracted,
+)
 from src.corpus_factory.extraction.dispatcher import (
     dispatch,
 )
 from src.corpus_factory.extraction.loader import (
     iter_tasks,
-    load_ingestion_manifest,
+    load_raw_exact_manifest,
     read_checksum,
 )
 from src.corpus_factory.extraction.result import (
@@ -46,146 +52,18 @@ def utc_now() -> str:
     )
 
 
-def completed_ingestions(
-    extracted_dir: Path,
-) -> set[
-    tuple[str, str]
-]:
-    completed = set()
-
-    if not extracted_dir.is_dir():
-        return completed
-
-    for directory in (
-        extracted_dir.iterdir()
-    ):
-        if not directory.is_dir():
-            continue
-
-        manifest_path = (
-            directory
-            / "manifest.json"
-        )
-
-        checksum_path = (
-            directory
-            / "manifest.json.sha256"
-        )
-
-        if (
-            not manifest_path.is_file()
-            or not checksum_path.is_file()
-        ):
-            continue
-
-        try:
-            expected_hash = (
-                read_checksum(
-                    checksum_path
-                )
-            )
-
-            actual_hash = sha256_file(
-                manifest_path
-            )
-
-            if (
-                actual_hash
-                != expected_hash
-            ):
-                continue
-
-            manifest = json.loads(
-                manifest_path.read_text(
-                    encoding="utf-8"
-                )
-            )
-
-            if not isinstance(
-                manifest,
-                dict,
-            ):
-                continue
-
-            if (
-                manifest.get(
-                    "schema_version"
-                )
-                != MANIFEST_SCHEMA_VERSION
-            ):
-                continue
-
-            if (
-                manifest.get(
-                    "record_type"
-                )
-                != MANIFEST_RECORD_TYPE
-            ):
-                continue
-
-            extraction_id = manifest.get(
-                "extraction_id"
-            )
-
-            if (
-                extraction_id
-                != directory.name
-            ):
-                continue
-
-            source = manifest.get(
-                "source"
-            )
-
-            if not isinstance(
-                source,
-                dict,
-            ):
-                continue
-
-            ingestion_id = source.get(
-                "ingestion_id"
-            )
-
-            ingestion_hash = source.get(
-                "ingestion_manifest_sha256"
-            )
-
-            if (
-                isinstance(
-                    ingestion_id,
-                    str,
-                )
-                and isinstance(
-                    ingestion_hash,
-                    str,
-                )
-                and is_valid_sha256(
-                    ingestion_hash
-                )
-            ):
-                completed.add(
-                    (
-                        ingestion_id,
-                        ingestion_hash,
-                    )
-                )
-
-        except (
-            OSError,
-            UnicodeError,
-            ValueError,
-            json.JSONDecodeError,
-        ):
-            continue
-
-    return completed
-
-
 def write_checksum(
     path: Path,
     digest: str,
 ) -> None:
+    if not is_valid_sha256(
+        digest
+    ):
+        raise ValueError(
+            f"Invalid SHA-256: "
+            f"{digest}"
+        )
+
     with path.open(
         "x",
         encoding="ascii",
@@ -202,11 +80,335 @@ def write_checksum(
         )
 
 
-def extract_ingestion(
+def load_published_extraction(
+    extraction_dir: Path,
+) -> tuple[dict, str]:
+    manifest_path = (
+        extraction_dir
+        / "manifest.json"
+    )
+
+    checksum_path = (
+        extraction_dir
+        / "manifest.json.sha256"
+    )
+
+    if (
+        not manifest_path.is_file()
+        or not checksum_path.is_file()
+    ):
+        raise ValueError(
+            f"Incomplete extraction run: "
+            f"{extraction_dir}"
+        )
+
+    expected_hash = read_checksum(
+        checksum_path
+    )
+
+    actual_hash = sha256_file(
+        manifest_path
+    )
+
+    if (
+        expected_hash
+        != actual_hash
+    ):
+        raise ValueError(
+            f"Extraction manifest checksum "
+            f"mismatch: {manifest_path}"
+        )
+
+    try:
+        manifest = json.loads(
+            manifest_path.read_text(
+                encoding="utf-8"
+            )
+        )
+
+    except (
+        OSError,
+        UnicodeError,
+        json.JSONDecodeError,
+    ) as error:
+        raise ValueError(
+            f"Invalid extraction manifest: "
+            f"{manifest_path}"
+        ) from error
+
+    if (
+        not isinstance(
+            manifest,
+            dict,
+        )
+        or manifest.get(
+            "record_type"
+        )
+        != MANIFEST_RECORD_TYPE
+    ):
+        raise ValueError(
+            "Invalid extraction manifest"
+        )
+
+    if (
+        manifest.get(
+            "extraction_id"
+        )
+        != extraction_dir.name
+    ):
+        raise ValueError(
+            "Extraction ID does not match "
+            "directory name"
+        )
+
+    return (
+        manifest,
+        actual_hash,
+    )
+
+
+def completed_raw_exact_runs(
+    extracted_dir: Path,
+) -> set[
+    tuple[str, str]
+]:
+    completed = set()
+
+    if not extracted_dir.is_dir():
+        return completed
+
+    for directory in (
+        extracted_dir.iterdir()
+    ):
+        if not directory.is_dir():
+            continue
+
+        try:
+            manifest, _ = (
+                load_published_extraction(
+                    directory
+                )
+            )
+
+        except ValueError:
+            continue
+
+        source = manifest.get(
+            "source"
+        )
+
+        if not isinstance(
+            source,
+            dict,
+        ):
+            continue
+
+        raw_exact_id = source.get(
+            "raw_exact_id"
+        )
+
+        raw_exact_hash = source.get(
+            "raw_exact_manifest_sha256"
+        )
+
+        if (
+            isinstance(
+                raw_exact_id,
+                str,
+            )
+            and isinstance(
+                raw_exact_hash,
+                str,
+            )
+            and is_valid_sha256(
+                raw_exact_hash
+            )
+        ):
+            completed.add(
+                (
+                    raw_exact_id,
+                    raw_exact_hash,
+                )
+            )
+
+    return completed
+
+
+def sync_extraction_to_index(
     *,
-    ingestion_dir: Path,
-    ingestion_manifest: dict,
-    ingestion_manifest_sha256: str,
+    extraction_dir: Path,
+    index_path: Path,
+) -> None:
+    manifest, _ = (
+        load_published_extraction(
+            extraction_dir
+        )
+    )
+
+    extraction_id = manifest[
+        "extraction_id"
+    ]
+
+    records = manifest.get(
+        "artifacts",
+        {}
+    ).get(
+        "records"
+    )
+
+    if not isinstance(
+        records,
+        dict,
+    ):
+        raise ValueError(
+            "Extraction manifest has "
+            "no records artifact"
+        )
+
+    relative_path = records.get(
+        "relative_path"
+    )
+
+    expected_hash = records.get(
+        "sha256"
+    )
+
+    if (
+        relative_path
+        != "documents.jsonl"
+        or not isinstance(
+            expected_hash,
+            str,
+        )
+        or not is_valid_sha256(
+            expected_hash
+        )
+    ):
+        raise ValueError(
+            "Invalid extraction "
+            "records artifact"
+        )
+
+    records_path = (
+        extraction_dir
+        / relative_path
+    )
+
+    if (
+        sha256_file(
+            records_path
+        )
+        != expected_hash
+    ):
+        raise ValueError(
+            "Extraction records "
+            "checksum mismatch"
+        )
+
+    with open_index(
+        index_path
+    ) as connection:
+        if extraction_is_indexed(
+            connection,
+            extraction_id,
+        ):
+            return
+
+        with records_path.open(
+            "r",
+            encoding="utf-8",
+            newline="",
+        ) as stream:
+            for line_number, line in enumerate(
+                stream,
+                start=1,
+            ):
+                try:
+                    record = json.loads(
+                        line
+                    )
+
+                except json.JSONDecodeError as error:
+                    raise ValueError(
+                        f"Invalid extraction record "
+                        f"at line {line_number}"
+                    ) from error
+
+                if (
+                    record.get(
+                        "status"
+                    )
+                    != "extracted"
+                ):
+                    continue
+
+                register_extracted(
+                    connection,
+                    source_sha256=(
+                        record[
+                            "source_sha256"
+                        ]
+                    ),
+                    source_size_bytes=(
+                        record[
+                            "source_size_bytes"
+                        ]
+                    ),
+                    canonical_document_id=(
+                        record[
+                            "document_id"
+                        ]
+                    ),
+                    canonical_ingestion_id=(
+                        record[
+                            "ingestion_id"
+                        ]
+                    ),
+                    original_filename=(
+                        record[
+                            "original_filename"
+                        ]
+                    ),
+                )
+
+        mark_extraction_indexed(
+            connection,
+            extraction_id,
+        )
+
+
+def synchronize_existing_extractions(
+    *,
+    extracted_dir: Path,
+    index_path: Path,
+) -> None:
+    if not extracted_dir.is_dir():
+        return
+
+    for extraction_dir in sorted(
+        extracted_dir.iterdir()
+    ):
+        if not extraction_dir.is_dir():
+            continue
+
+        try:
+            sync_extraction_to_index(
+                extraction_dir=(
+                    extraction_dir
+                ),
+                index_path=index_path,
+            )
+
+        except ValueError:
+            continue
+
+
+def extract_raw_exact_run(
+    *,
+    raw_exact_dir: Path,
+    raw_exact_manifest: dict,
+    raw_exact_manifest_sha256: str,
+    raw_storage_dir: Path,
     extracted_dir: Path,
     workers: int,
 ) -> Path:
@@ -261,11 +463,14 @@ def extract_ingestion(
         }
 
         tasks = iter_tasks(
-            ingestion_dir=(
-                ingestion_dir
+            raw_exact_dir=(
+                raw_exact_dir
             ),
-            manifest=(
-                ingestion_manifest
+            raw_exact_manifest=(
+                raw_exact_manifest
+            ),
+            raw_storage_dir=(
+                raw_storage_dir
             ),
             output_documents_dir=(
                 documents_dir
@@ -290,7 +495,9 @@ def extract_ingestion(
 
                 record[
                     "status"
-                ] = result.status.value
+                ] = (
+                    result.status.value
+                )
 
                 record[
                     "warnings"
@@ -318,7 +525,8 @@ def extract_ingestion(
                 summary[
                     "source_bytes"
                 ] += (
-                    result.source_size_bytes
+                    result
+                    .source_size_bytes
                 )
 
                 if (
@@ -393,15 +601,6 @@ def extract_ingestion(
                 records.fileno()
             )
 
-        if (
-            summary["total"]
-            == 0
-        ):
-            raise ValueError(
-                "Extraction input contains "
-                "no documents"
-            )
-
         records_hash = sha256_file(
             records_path
         )
@@ -431,14 +630,41 @@ def extract_ingestion(
                 extraction_id
             ),
             "created_at": utc_now(),
+            "raw_exact_id": (
+                raw_exact_manifest[
+                    "raw_exact_id"
+                ]
+            ),
+            "ingestion_id": (
+                raw_exact_manifest[
+                    "ingestion_id"
+                ]
+            ),
+            "batch_id": (
+                raw_exact_manifest[
+                    "batch_id"
+                ]
+            ),
             "source": {
+                "raw_exact_id": (
+                    raw_exact_manifest[
+                        "raw_exact_id"
+                    ]
+                ),
+                "raw_exact_manifest_sha256": (
+                    raw_exact_manifest_sha256
+                ),
                 "ingestion_id": (
-                    ingestion_manifest[
+                    raw_exact_manifest[
                         "ingestion_id"
                     ]
                 ),
                 "ingestion_manifest_sha256": (
-                    ingestion_manifest_sha256
+                    raw_exact_manifest[
+                        "source"
+                    ][
+                        "ingestion_manifest_sha256"
+                    ]
                 ),
             },
             "artifacts": {
@@ -544,7 +770,9 @@ def extract_ingestion(
 def extraction(
     *,
     raw_storage_dir: Path,
+    raw_exact_dir: Path,
     extracted_dir: Path,
+    index_path: Path,
     workers: int = 4,
 ) -> None:
     if workers <= 0:
@@ -552,9 +780,9 @@ def extraction(
             "workers must be positive"
         )
 
-    if not raw_storage_dir.is_dir():
+    if not raw_exact_dir.is_dir():
         print(
-            "No ingestion data found."
+            "No Raw Exact data found."
         )
         return
 
@@ -563,64 +791,87 @@ def extraction(
         exist_ok=True,
     )
 
-    completed = completed_ingestions(
+    synchronize_existing_extractions(
+        extracted_dir=(
+            extracted_dir
+        ),
+        index_path=index_path,
+    )
+
+    completed = completed_raw_exact_runs(
         extracted_dir
     )
 
-    processed = 0
-
-    ingestion_dirs = sorted(
+    raw_exact_runs = sorted(
         path
         for path
-        in raw_storage_dir.iterdir()
+        in raw_exact_dir.iterdir()
         if path.is_dir()
         and path.name.startswith(
-            "ingestion_"
+            "raw_exact_"
         )
     )
 
-    if not ingestion_dirs:
+    if not raw_exact_runs:
         print(
-            "No ingestion data found."
+            "No Raw Exact data found."
         )
         return
 
-    for ingestion_dir in ingestion_dirs:
+    processed = 0
+
+    for run_dir in raw_exact_runs:
         (
-            ingestion_manifest,
-            ingestion_hash,
-        ) = load_ingestion_manifest(
-            ingestion_dir
+            raw_exact_manifest,
+            raw_exact_hash,
+        ) = load_raw_exact_manifest(
+            run_dir
         )
 
         state = (
-            ingestion_manifest[
-                "ingestion_id"
+            raw_exact_manifest[
+                "raw_exact_id"
             ],
-            ingestion_hash,
+            raw_exact_hash,
         )
 
         if state in completed:
             print(
                 f"Skipped existing extraction: "
-                f"{ingestion_dir.name}"
+                f"{run_dir.name}"
             )
             continue
 
-        manifest_path = extract_ingestion(
-            ingestion_dir=(
-                ingestion_dir
+        manifest_path = (
+            extract_raw_exact_run(
+                raw_exact_dir=(
+                    run_dir
+                ),
+                raw_exact_manifest=(
+                    raw_exact_manifest
+                ),
+                raw_exact_manifest_sha256=(
+                    raw_exact_hash
+                ),
+                raw_storage_dir=(
+                    raw_storage_dir
+                ),
+                extracted_dir=(
+                    extracted_dir
+                ),
+                workers=workers,
+            )
+        )
+
+        published_dir = (
+            manifest_path.parent
+        )
+
+        sync_extraction_to_index(
+            extraction_dir=(
+                published_dir
             ),
-            ingestion_manifest=(
-                ingestion_manifest
-            ),
-            ingestion_manifest_sha256=(
-                ingestion_hash
-            ),
-            extracted_dir=(
-                extracted_dir
-            ),
-            workers=workers,
+            index_path=index_path,
         )
 
         completed.add(
@@ -631,7 +882,7 @@ def extraction(
 
         print(
             f"Extraction complete: "
-            f"{ingestion_dir.name}"
+            f"{run_dir.name}"
         )
 
         print(
@@ -641,6 +892,6 @@ def extraction(
 
     if processed == 0:
         print(
-            "No pending ingestion "
+            "No pending Raw Exact "
             "runs for extraction."
         )

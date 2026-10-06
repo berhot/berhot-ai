@@ -15,8 +15,10 @@ class ExtractionStatus(
 
 @dataclass(frozen=True)
 class ExtractionTask:
+    raw_exact_id: str
     ingestion_id: str
     batch_id: str
+
     document_id: str
     artifact_id: str
 
@@ -35,8 +37,10 @@ class ExtractionTask:
 
 @dataclass(frozen=True)
 class ExtractionResult:
+    raw_exact_id: str
     ingestion_id: str
     batch_id: str
+
     document_id: str
     artifact_id: str
 
