@@ -285,6 +285,9 @@ def intake(
                     batch_dir=(
                         batch_dir
                     ),
+                    source_name=(
+                        source.name
+                    ),
                     platform=(
                         platform
                     ),

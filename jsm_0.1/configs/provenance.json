@@ -1,0 +1,67 @@
+{
+  "schema_version": "1.0.0",
+
+  "default": {
+    "training_use": "review_required",
+    "basis": "No explicit provenance rule exists for this source.",
+    "authority": "provenance_policy"
+  },
+
+  "sources": {
+    "wikipedia-ar": {
+      "training_use": "allowed",
+      "basis": "Approved source for model training.",
+      "authority": "provenance_policy"
+    },
+
+    "aramco": {
+      "training_use": "review_required",
+      "basis": "Source requires explicit rights review.",
+      "authority": "provenance_policy"
+    },
+
+    "berhot": {
+      "training_use": "allowed",
+      "basis": "Internal Berhot source approved for model training.",
+      "authority": "provenance_policy"
+    },
+
+    "riyadh-municipality": {
+      "training_use": "allowed",
+      "basis": "Riyadh Municipality source approved for model training.",
+      "authority": "provenance_policy"
+    },
+
+    "ali-hassan": {
+      "training_use": "denied",
+      "basis": "Source is not approved for model training.",
+      "authority": "provenance_policy"
+    },
+
+    "random": {
+      "training_use": "review_required",
+      "basis": "Source requires explicit provenance review before model training.",
+      "authority": "provenance_policy"
+    },
+
+    "unattributed": {
+      "training_use": "denied",
+      "basis": "Unattributed files are not approved for model training.",
+      "authority": "provenance_policy"
+    },
+
+    "private-documents": {
+      "training_use": "denied",
+      "basis": "Private source is not approved for model training.",
+      "authority": "provenance_policy"
+    }
+  },
+
+  "platforms": {
+    "wikipedia": {
+      "training_use": "allowed",
+      "basis": "Approved Wikipedia source policy.",
+      "authority": "provenance_policy"
+    }
+  }
+}

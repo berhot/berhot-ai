@@ -252,6 +252,7 @@ def copy_file_to_batch(
 
 def write_manifest(
     batch_dir: Path,
+    source_name: str,
     platform: str,
     origin: dict,
     artifacts: list[dict],
@@ -269,6 +270,7 @@ def write_manifest(
         ),
         "batch_id": batch_dir.name,
         "source": {
+            "name": source_name,
             "platform": platform,
             "collection_time": (
                 collection_time
@@ -298,7 +300,9 @@ def write_manifest(
         manifest,
         indent=2,
         ensure_ascii=False,
-    ).encode("utf-8")
+    ).encode(
+        "utf-8"
+    )
 
     manifest_path = (
         batch_dir

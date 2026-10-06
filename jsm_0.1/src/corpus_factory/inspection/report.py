@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
-from paths import STORAGE_DIR, QUARANTINE_DIR
+from paths import STORAGE_DIR, QUARANTINE_DIR, REJECTED_DIR
 from src.corpus_factory.inspection.result import InspectionResult
 
 INSPECTOR_VERSION = '2.0.0'
@@ -61,8 +61,13 @@ def write_inspection_report(batch_dir: Path, result: InspectionResult,
     return publish_record(catalog_dir, inspection_id, 'manifest.json', record)
 
 
+def verified_record(path: Path) -> bool:
+    return hashlib.sha256(path.read_bytes()).hexdigest() == path.with_suffix('.json.sha256').read_text().strip()
+
+
 def completed_batches(policy, catalog_dir: Path = INSPECTIONS_DIR,
-                      quarantine_dir: Path = QUARANTINE_DIR):
+                      quarantine_dir: Path = QUARANTINE_DIR,
+                      rejected_dir: Path = REJECTED_DIR):
     """Legacy batch-local reports never satisfy the current inspection contract."""
     completed = set()
     for path in catalog_dir.glob('inspection_*/manifest.json'):
@@ -77,10 +82,12 @@ def completed_batches(policy, catalog_dir: Path = INSPECTIONS_DIR,
                     and record.get('policy') == policy):
                 if record['inspection_id'] != path.parent.name:
                     continue
-                if record['errors'] or record['summary']['quarantined'] or record['summary']['rejected']:
-                    reference = quarantine_dir / record['batch_id'] / record['inspection_id'] / 'quarantine.json'
-                    reference_bytes = reference.read_bytes()
-                    if hashlib.sha256(reference_bytes).hexdigest() != reference.with_suffix('.json.sha256').read_text().strip():
+                record_dir = Path(record['batch_id']) / record['inspection_id']
+                if record['errors'] or record['summary']['quarantined']:
+                    if not verified_record(quarantine_dir / record_dir / 'quarantine.json'):
+                        continue
+                if record['summary']['rejected']:
+                    if not verified_record(rejected_dir / record_dir / 'rejected.json'):
                         continue
                 completed.add(record['incoming_batch'])
         except (OSError, ValueError, KeyError, TypeError):

@@ -1,4 +1,4 @@
-"""Quarantine holds control references, never copies or moves incoming objects."""
+"""Quarantine is the human review queue: it holds control references, never copies or moves incoming objects."""
 from pathlib import Path
 
 from paths import QUARANTINE_DIR
@@ -6,15 +6,21 @@ from src.corpus_factory.inspection.report import publish_record, utc_now
 from src.corpus_factory.inspection.result import InspectionDecision as D, InspectionResult
 
 
-def quarantine_batch(batch_dir: Path, result: InspectionResult, inspection_id: str,
-                     quarantine_dir: Path = QUARANTINE_DIR) -> Path | None:
-    references = [
+def artifact_references(batch_dir: Path, result: InspectionResult, inspection_id: str,
+                        decision: D) -> list[dict]:
+    return [
         {'batch_id': result.batch_id, 'artifact_id': a.artifact_id,
          'decision': a.decision, 'reason': a.errors,
          'inspection_id': inspection_id,
          'source_reference': str(Path(batch_dir).absolute() / a.stored_relative_path)}
-        for a in result.artifacts if a.decision != D.ACCEPTED
+        for a in result.artifacts if a.decision == decision
     ]
+
+
+def quarantine_batch(batch_dir: Path, result: InspectionResult, inspection_id: str,
+                     quarantine_dir: Path = QUARANTINE_DIR) -> Path | None:
+    """Record quarantined artifacts and batch-level failures; both need a human decision."""
+    references = artifact_references(batch_dir, result, inspection_id, D.QUARANTINED)
     if not references and result.batch_valid:
         return None
     record = {

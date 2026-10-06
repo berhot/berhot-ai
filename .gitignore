@@ -7,3 +7,16 @@ __pycache__/
 .venv/
 venv/
 .DS_Store
+
+
+# Generated/runtime storage
+jsm_0.1/storage/**
+!jsm_0.1/storage/.gitkeep
+
+# Keep test input files
+!jsm_0.1/storage/uploads/
+!jsm_0.1/storage/uploads/**
+
+# Generated model artifacts
+jsm_0.1/artifacts/**
+!jsm_0.1/artifacts/.gitkeep

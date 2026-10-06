@@ -9,6 +9,9 @@ from src.corpus_factory.inspection.inspector import (
 from src.corpus_factory.inspection.quarantine import (
     quarantine_batch,
 )
+from src.corpus_factory.inspection.rejection import (
+    reject_batch,
+)
 from src.corpus_factory.inspection.report import (
     completed_batches,
     write_inspection_report,
@@ -81,6 +84,14 @@ def inspection(
             )
         )
 
+        rejected_path = (
+            reject_batch(
+                batch_dir,
+                result,
+                inspection_id,
+            )
+        )
+
         summary = result.summary
 
         print(
@@ -112,4 +123,10 @@ def inspection(
             print(
                 f"Quarantine: "
                 f"{quarantine_path}"
+            )
+
+        if rejected_path:
+            print(
+                f"Rejected record: "
+                f"{rejected_path}"
             )
