@@ -29,7 +29,7 @@ def test_voice_loaded_once_and_outputs_marked_synthetic(tmp_path: Path, monkeypa
         return Voice()
 
     monkeypatch.setattr(module.PiperVoice, "load", load)
-    backend = module.PiperTTSBackend(TTSConfig(model_directory=tmp_path, output_directory=tmp_path / "generated"))
+    backend = module.PiperTTSBackend(TTSConfig(model_directory=tmp_path, output_directory=tmp_path / "generated", natural_pauses=False))
     first = backend.synthesize("مرحبا")
     second = backend.synthesize("شكرا")
     assert len(loads) == 1
@@ -44,7 +44,8 @@ def test_voice_loaded_once_and_outputs_marked_synthetic(tmp_path: Path, monkeypa
 
 @pytest.mark.parametrize("settings", [
     {"voice": "../escape"}, {"volume": 0}, {"length_scale": -1},
-    {"device": "unsupported"}, {"sample_rate_hz": 0},
+    {"device": "unsupported"}, {"sample_rate_hz": 0}, {"backend": "other"},
+    {"noise_scale": 3}, {"noise_w_scale": "high"}, {"natural_pauses": 1},
 ])
 def test_invalid_tts_configuration(settings) -> None:
     with pytest.raises(ValueError):

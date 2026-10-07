@@ -45,6 +45,23 @@ python -m pytest
 
 The default sequential chat records eight seconds after Enter and stops after at most twenty turns. `--seconds` and `--max-turns` override those limits. Ctrl+C closes audio streams. Streaming waits for sustained speech and ends after silence or the configured duration cap. Barge-in needs headphones because acoustic echo cancellation is not implemented; the microphone may otherwise detect the assistant's own speakers.
 
+## Own voice
+
+The project trains its own voice from recordings, with its own code: a letter-based text frontend, an acoustic model that learns its own letter-to-sound alignment, and Griffin-Lim waveform synthesis. No external voice model, phonemizer, aligner, or vocoder is involved. The voice sounds like whoever recorded the corpus, so a Saudi voice needs a Saudi speaker.
+
+```powershell
+python -m scripts.record_voice_corpus --speaker faris --consent
+python -m scripts.train_voice --speaker faris --minutes 120
+```
+
+`record_voice_corpus` shows one sentence at a time from `data/voice_prompts/saudi.txt` (800 Saudi sentences, about an hour of speech, taken from the Apache-2.0 dataset `VohoAI/voho-saudi-dialogues`). It records at 22,050 Hz, rejects takes that are clipped, too quiet, or too short, and keeps progress between sessions in `storage/voice_corpus/<speaker>/`. Record only a speaker who has agreed to it; `--consent` records that statement in `speaker.json`.
+
+`train_voice` writes `artifacts/models/tts/jsm-saudi.pt` and continues from where it stopped when run again. To speak with it, set `"backend": "jsm"` and `"voice": "jsm-saudi"` in `configs/tts.json`. Twenty recordings are the minimum to train at all; a clear voice needs several hundred and a few hours of training. Griffin-Lim gives an understandable but slightly metallic sound; a trained vocoder is the next step for a natural one.
+
+Until an own voice is trained, the default backend is Piper's `ar_JO-kareem-medium`, a third-party Jordanian voice. Whisper speech recognition is also a third-party model.
+
+Every backend speaks through `src/tts/prosody.py`, which belongs to this project: it speaks one sentence at a time, sets the pause after each by its punctuation, splits a long unpunctuated reply at a joining word, and adds a quiet generated breath after about five seconds of speech. `"natural_pauses": false` turns this off for Piper. Piper's `noise_scale` and `noise_w_scale` control how much its pitch and timing vary.
+
 ## Configuration
 
 `configs/voice.json` references typed audio, VAD, ASR, LLM, TTS, device, streaming, and privacy settings, plus runtime paths. `voice_turn` and `voice_chat` accept `--config` for this bundle. Component CLIs retain their component config options.
@@ -85,7 +102,7 @@ Configured runtime roots are checked before production recording/output flows. G
 
 Whisper and Piper do not upload recordings or text during inference. Model downloads explicitly contact package/model hosts. The JSM adapter permits loopback endpoints by default, bypasses environment proxies, and rejects redirects. Enabling `allow_remote` explicitly allows transcript/history transfer to the configured endpoint. The current workspace is under OneDrive, whose synchronization is outside the application's control; ignored Git files can still be synchronized by OneDrive.
 
-Transcripts and generated text remain in local manifests and result JSON. Logs omit transcript content. Generated speech is marked synthetic. Voice cloning and speaker biometric identification are not implemented. Dependencies and each voice model's dataset/license terms require review before redistribution or deployment.
+Transcripts and generated text remain in local manifests and result JSON. Logs omit transcript content. Generated speech is marked synthetic. A voice is trained only from a corpus recorded with `record_voice_corpus` under the speaker's stated consent; speaker biometric identification is not implemented. Dependencies and each voice model's dataset/license terms require review before redistribution or deployment.
 
 ## Current limits
 

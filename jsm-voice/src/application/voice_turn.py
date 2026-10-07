@@ -73,7 +73,7 @@ def build_voice_service(config: VoiceConfig | None = None) -> VoiceTurnService:
     from src.asr.backends.faster_whisper import FasterWhisperBackend
     from src.corpus.manifest import create_voice_manifest
     from src.llm.jsm_adapter import JSMTextModelBackend
-    from src.tts.piper_backend import PiperTTSBackend
+    from src.tts.factory import load_tts_backend
     from src.vad.service import segment_audio
 
     config = config if config is not None else load_voice_config()
@@ -83,5 +83,5 @@ def build_voice_service(config: VoiceConfig | None = None) -> VoiceTurnService:
 
     return VoiceTurnService(
         preprocess, FasterWhisperBackend(config.asr),
-        JSMTextModelBackend(config.llm), PiperTTSBackend(config.tts, config.privacy), config.runtime.turns_directory,
+        JSMTextModelBackend(config.llm), load_tts_backend(config.tts, config.privacy), config.runtime.turns_directory,
     )

@@ -20,12 +20,22 @@ class TTSConfig:
     length_scale: float = 1.0
     volume: float = 1.0
     sample_rate_hz: int | None = None
+    # Piper only: how much pitch and timing vary between words. null keeps the voice's default.
+    noise_scale: float | None = None
+    noise_w_scale: float | None = None
+    natural_pauses: bool = True
 
     def __post_init__(self) -> None:
-        if self.backend != "piper" or self.device not in ("cpu", "cuda"):
+        if self.backend not in ("piper", "jsm") or self.device not in ("cpu", "cuda"):
             raise ValueError("Unsupported TTS backend or device.")
         if not re.fullmatch(r"[A-Za-z0-9_-]+", self.voice):
-            raise ValueError("Invalid Piper voice name.")
+            raise ValueError("Invalid voice name.")
+        for name in ("noise_scale", "noise_w_scale"):
+            value = getattr(self, name)
+            if value is not None and (type(value) not in (int, float) or not isfinite(value) or not 0 <= value <= 2):
+                raise ValueError(f"TTS {name} must be between 0 and 2, or null.")
+        if type(self.natural_pauses) is not bool:
+            raise ValueError("natural_pauses must be true or false.")
         if not isfinite(self.length_scale) or not 0.25 <= self.length_scale <= 4:
             raise ValueError("TTS length scale must be between 0.25 and 4.")
         if not isfinite(self.volume) or not 0 < self.volume <= 2:

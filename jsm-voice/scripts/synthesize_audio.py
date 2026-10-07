@@ -10,9 +10,9 @@ def main() -> None:
     parser.add_argument("--config", type=Path, default=DEFAULT_TTS_CONFIG_PATH)
     args = parser.parse_args()
     try:
-        from src.tts.piper_backend import PiperTTSBackend
+        from src.tts.factory import load_tts_backend
 
-        backend = PiperTTSBackend(load_tts_config(args.config))
+        backend = load_tts_backend(load_tts_config(args.config))
         result = backend.synthesize(args.text)
     except (ValueError, OSError, RuntimeError, ImportError) as error:
         parser.exit(2, f"error: {error}\n")

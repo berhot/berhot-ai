@@ -6,5 +6,8 @@
   "device": "cpu",
   "length_scale": 1.0,
   "volume": 1.0,
-  "sample_rate_hz": null
+  "sample_rate_hz": null,
+  "noise_scale": null,
+  "noise_w_scale": null,
+  "natural_pauses": true
 }

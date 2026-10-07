@@ -20,7 +20,7 @@ from src.config import load_voice_config
 from src.corpus.manifest import create_voice_manifest
 from src.llm.models import TextGenerationResult
 from src.privacy import write_recording_receipt
-from src.tts.piper_backend import PiperTTSBackend
+from src.tts.factory import load_tts_backend
 from src.vad.service import segment_audio
 
 
@@ -129,9 +129,9 @@ def serve(config, root):
         if path.is_dir() and not path.is_symlink() and len(path.name) == 32 and all(c in "0123456789abcdef" for c in path.name):
             remove_job(path, root)
     asr = FasterWhisperBackend(config.asr)
-    tts = PiperTTSBackend(config.tts, config.privacy)
+    tts = load_tts_backend(config.tts, config.privacy)
     emit({"event": "ready", "asr": config.asr.model, "tts": config.tts.voice,
-          "device": asr.device, "sample_rate_hz": tts._voice.config.sample_rate,
+          "device": asr.device, "sample_rate_hz": tts.sample_rate_hz,
           "max_recording_seconds": 30, "retention": "delete_after_request"})
     for line in sys.stdin:
         try:
