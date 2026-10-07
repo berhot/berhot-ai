@@ -1,0 +1,9 @@
+{
+  "chunk_duration_ms": 30,
+  "speech_start_ms": 180,
+  "silence_timeout_ms": 700,
+  "padding_ms": 240,
+  "max_utterance_ms": 30000,
+  "max_wait_seconds": 30.0,
+  "aggressiveness": 2
+}
