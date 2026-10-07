@@ -1,0 +1,17 @@
+{
+  "name": "jsm-apps",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "public/website/web",
+    "public/chat/web",
+    "internal/admin_console/web"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "lint": "npm run lint --workspaces",
+    "dev:website": "npm run dev --workspace @jsm/website-web",
+    "dev:chat": "npm run dev --workspace @jsm/chat-web",
+    "dev:admin": "npm run dev --workspace @jsm/admin-console-web"
+  }
+}

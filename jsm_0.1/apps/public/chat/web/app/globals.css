@@ -1,0 +1,5 @@
+@import "tailwindcss";
+@import "../../../../shared/theme.css";
+
+/* `dark:` follows the theme the user picked, not the OS setting. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));

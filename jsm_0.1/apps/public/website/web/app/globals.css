@@ -1,0 +1,7 @@
+@import "tailwindcss";
+@import "../../../../shared/theme.css";
+
+/* `ar:` styles text whose language is Arabic. Latin fragments inside an
+   Arabic page (JSM, endpoint paths, code) carry lang="en" and opt out, so
+   tracking and uppercase never touch joined Arabic letters. */
+@custom-variant ar (&:lang(ar));

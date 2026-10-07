@@ -1,30 +1,20 @@
 import hashlib
 
 
-def choose_split(
-    split_key: str,
-) -> str:
+def choose_split(document_id: str) -> str:
     """
-    Deterministic split.
+    Deterministic split based on document_id.
 
     90% train
     5% validation
     5% test
-
-    The same split_key will always receive
-    the same split.
     """
 
     digest = hashlib.sha256(
-        split_key.encode(
-            "utf-8"
-        )
-    ).digest()
+        document_id.encode("utf-8")
+    ).hexdigest()
 
-    bucket = int.from_bytes(
-        digest[:8],
-        byteorder="big",
-    ) % 100
+    bucket = int(digest[:8], 16) % 100
 
     if bucket < 90:
         return "train"
@@ -34,36 +24,27 @@ def choose_split(
 
     return "test"
 
-
 def assign_splits(
-    split_keys: list[str],
+    document_ids: list[str],
 ) -> dict[str, str]:
     """
-    Assign deterministic splits.
+    Split every document, keeping train non-empty.
 
-    For very small MVP corpora, hashing can
-    theoretically leave train empty.
-
-    If that happens, put everything in train
-    so tokenizer/model training can still run.
+    On a tiny corpus the hash split can leave train
+    with no documents, which makes tokenizer training
+    and model training impossible. In that case every
+    document goes to train.
     """
 
     splits = {
-        split_key: choose_split(
-            split_key
-        )
-        for split_key in split_keys
+        document_id: choose_split(document_id)
+        for document_id in document_ids
     }
 
-    if (
-        splits
-        and "train"
-        not in splits.values()
-    ):
+    if splits and "train" not in splits.values():
         return {
-            split_key: "train"
-            for split_key
-            in split_keys
+            document_id: "train"
+            for document_id in splits
         }
 
     return splits

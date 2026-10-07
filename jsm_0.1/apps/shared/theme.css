@@ -1,0 +1,104 @@
+/* JSM design language, shared by every web app.
+   Imported after tailwindcss from each app's globals.css. */
+
+/* Design tokens. The names are roles, not literal colours:
+   ink = page background, paper = text, amber = the one accent.
+   Light values are the default; the dark theme overrides them below. */
+@theme {
+  --color-ink: #f6f2e9;
+  --color-surface: #fcfaf5;
+  --color-raised: #ebe5d8;
+  --color-line: #ddd5c4;
+  --color-line-strong: #b5aa94;
+  --color-paper: #1c1914;
+  --color-muted: #5e5749;
+  --color-faint: #746c5d;
+  --color-amber: #99600a;
+  --color-amber-bright: #b47412;
+  --color-amber-ink: #fffaf0;
+  --color-danger: #b23a20;
+
+  --animate-rise: rise 260ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  --animate-caret: caret 1.1s steps(1, end) infinite;
+
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes caret {
+    0%,
+    55% {
+      opacity: 1;
+    }
+    56%,
+    100% {
+      opacity: 0.15;
+    }
+  }
+}
+
+/* Plex Sans Arabic covers Latin and Arabic; mono falls back to it for
+   any Arabic that ends up inside a readout. */
+@theme inline {
+  --font-sans: var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono:
+    var(--font-plex-mono), var(--font-plex-sans), ui-monospace, monospace;
+}
+
+/* Dark theme: set by <html data-theme="dark"> (see preferences.tsx). */
+:root[data-theme="dark"] {
+  --color-ink: #14120f;
+  --color-surface: #1b1814;
+  --color-raised: #24201a;
+  --color-line: #2f2a23;
+  --color-line-strong: #4a4338;
+  --color-paper: #ebe5d8;
+  --color-muted: #a59d8c;
+  --color-faint: #8a8272;
+  --color-amber: #e3a23a;
+  --color-amber-bright: #f0b552;
+  --color-amber-ink: #1a1408;
+  --color-danger: #ec7a60;
+
+  color-scheme: dark;
+}
+
+@layer base {
+  html {
+    background: var(--color-ink);
+    color-scheme: light;
+  }
+
+  body {
+    background: var(--color-ink);
+    color: var(--color-paper);
+    font-family: var(--font-sans);
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--color-amber) 35%, transparent);
+  }
+
+  * {
+    scrollbar-color: var(--color-line-strong) transparent;
+    scrollbar-width: thin;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
