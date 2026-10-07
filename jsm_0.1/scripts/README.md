@@ -1,3 +1,8 @@
+corpus files in Cloudflare R2 (copy .env.example to .env and fill in the bucket keys):
+python -m scripts.r2_upload            copy storage/uploads and storage/staged to the bucket
+python -m scripts.r2_intake            fetch uploads/ from the bucket, then run intake
+python -m scripts.r2_intake --day 1    fetch one staged daily batch into uploads, then run intake
+
 python3 -m scripts.intake
 python3 -m scripts.inspection
 python3 -m scripts.provenance

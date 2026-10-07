@@ -9,6 +9,10 @@ STORAGE_DIR = PROJECT_DIR / "storage"
 
 UPLOADS_DIR = STORAGE_DIR / "uploads"
 
+# Text gathered for later training; nothing reads it until
+# its files are moved into uploads.
+STAGED_DIR = STORAGE_DIR / "staged"
+
 INCOMING_DIR = STORAGE_DIR / "incoming"
 BATCHES_DIR = INCOMING_DIR / "batches"
 
