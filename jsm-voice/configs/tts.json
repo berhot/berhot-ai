@@ -1,0 +1,10 @@
+{
+  "backend": "piper",
+  "voice": "ar_JO-kareem-medium",
+  "model_directory": "artifacts/models/tts",
+  "output_directory": "storage/generated",
+  "device": "cpu",
+  "length_scale": 1.0,
+  "volume": 1.0,
+  "sample_rate_hz": null
+}
