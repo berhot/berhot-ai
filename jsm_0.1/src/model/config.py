@@ -3,7 +3,7 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class ModelConfig:
-    vocab_size: int = 1000
+    vocab_size: int = 2000
     context_length: int = 128
 
     d_model: int = 128

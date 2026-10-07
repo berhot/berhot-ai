@@ -8,6 +8,7 @@ import torch
 from src.model.config import ModelConfig
 from src.model.model import TinyLLM
 from src.tokenization.tokenizer import Tokenizer
+from src.training.checkpoint import best_checkpoint_path
 
 
 class UnknownModelError(Exception):
@@ -89,6 +90,7 @@ class ModelManager:
         ] = OrderedDict()
 
         self._tokenizer: Tokenizer | None = None
+        self._tokenizer_signature: tuple | None = None
 
     # --------------------------------------------------
     # Discovery
@@ -286,6 +288,21 @@ class ModelManager:
                 )
             ]
 
+            # Training keeps the last epoch next to its best
+            # validation copy. Offer only the best one, so a
+            # run shows up as a single model.
+            if not include_checkpoints:
+                offered = {model["id"] for model in models}
+
+                models = [
+                    model
+                    for model in models
+                    if best_checkpoint_path(
+                        Path(model["id"])
+                    ).name
+                    not in offered
+                ]
+
             if not models:
                 return []
 
@@ -329,13 +346,22 @@ class ModelManager:
         """
 
         with self._lock:
-            if self._tokenizer is None:
-                if not self.tokenizer_path.is_file():
-                    raise ModelLoadError(
-                        f"Tokenizer not found: "
-                        f"{self.tokenizer_path}"
-                    )
+            if not self.tokenizer_path.is_file():
+                raise ModelLoadError(
+                    f"Tokenizer not found: "
+                    f"{self.tokenizer_path}"
+                )
 
+            # Reload when the file changes, so retraining the
+            # tokenizer does not need a server restart.
+            signature = self._signature(
+                self.tokenizer_path
+            )
+
+            if (
+                self._tokenizer is None
+                or signature != self._tokenizer_signature
+            ):
                 try:
                     self._tokenizer = Tokenizer.load(
                         self.tokenizer_path
@@ -345,6 +371,8 @@ class ModelManager:
                     raise ModelLoadError(
                         f"Cannot load tokenizer: {error}"
                     ) from error
+
+                self._tokenizer_signature = signature
 
             return self._tokenizer
 

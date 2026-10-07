@@ -14,6 +14,12 @@
       "authority": "provenance_policy"
     },
 
+    "saudi-dialect-conversations": {
+      "training_use": "allowed",
+      "basis": "Hugging Face dataset HeshamHaroon/saudi-dialect-conversations, published under Apache-2.0.",
+      "authority": "provenance_policy"
+    },
+
     "aramco": {
       "training_use": "review_required",
       "basis": "Source requires explicit rights review.",

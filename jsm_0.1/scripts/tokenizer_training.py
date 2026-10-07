@@ -19,7 +19,7 @@ if __name__ == "__main__":
 
     model = train_bpe(
         texts=texts,
-        target_vocab_size=1000,
+        target_vocab_size=2000,
     )
 
     tokenizer = Tokenizer(model)
