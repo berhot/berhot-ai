@@ -4,7 +4,7 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+from src.paths import PROJECT_ROOT
 DEFAULT_CONFIG_PATH = PROJECT_ROOT / "configs" / "audio.json"
 
 

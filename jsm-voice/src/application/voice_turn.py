@@ -13,6 +13,7 @@ from src.timing import StageTimer, TurnMeasurements, measure_turn
 from src.tts.interface import TTSBackend
 from src.application.models import VoiceTurnResult
 from src.cancellation import CancellationToken
+from src.config import VoiceConfig, load_voice_config
 
 Preprocessor = Callable[[Path], tuple[Path, VoiceManifest]]
 
@@ -68,20 +69,19 @@ class VoiceTurnService:
         return result
 
 
-def build_voice_service() -> VoiceTurnService:
+def build_voice_service(config: VoiceConfig | None = None) -> VoiceTurnService:
     from src.asr.backends.faster_whisper import FasterWhisperBackend
-    from src.asr.config import load_asr_config
     from src.corpus.manifest import create_voice_manifest
-    from src.llm.config import load_text_model_config
     from src.llm.jsm_adapter import JSMTextModelBackend
-    from src.tts.config import load_tts_config
     from src.tts.piper_backend import PiperTTSBackend
     from src.vad.service import segment_audio
 
+    config = config if config is not None else load_voice_config()
+
     def preprocess(path: Path) -> tuple[Path, VoiceManifest]:
-        return create_voice_manifest(segment_audio(path))
+        return create_voice_manifest(segment_audio(path, config.vad, config.audio), config.runtime.manifests_directory)
 
     return VoiceTurnService(
-        preprocess, FasterWhisperBackend(load_asr_config()),
-        JSMTextModelBackend(load_text_model_config()), PiperTTSBackend(load_tts_config()),
+        preprocess, FasterWhisperBackend(config.asr),
+        JSMTextModelBackend(config.llm), PiperTTSBackend(config.tts), config.runtime.turns_directory,
     )

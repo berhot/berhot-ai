@@ -5,10 +5,13 @@ from src.devices.playback import AudioPlayback
 from src.llm.models import ConversationMessage
 from src.artifacts import write_json_artifact
 from src.timing import StageTimer, measure_turn
+from pathlib import Path
+from src.paths import PROJECT_ROOT
 
 
-def run_voice_chat(service: VoiceTurnService, config: DeviceConfig) -> None:
-    capture = MicrophoneCapture(config)
+def run_voice_chat(service: VoiceTurnService, config: DeviceConfig,
+                    recording_directory: Path = PROJECT_ROOT / "storage/recordings") -> None:
+    capture = MicrophoneCapture(config, recording_directory)
     playback = AudioPlayback(config.output_device)
     history: tuple[ConversationMessage, ...] = ()
     try:

@@ -1,0 +1,16 @@
+{
+  "audio": "audio.json",
+  "vad": "vad.json",
+  "asr": "asr.json",
+  "llm": "llm.json",
+  "tts": "tts.json",
+  "devices": "devices.json",
+  "streaming": "streaming.json",
+  "runtime": {
+    "uploads_directory": "storage/uploads",
+    "recordings_directory": "storage/recordings",
+    "manifests_directory": "storage/manifests",
+    "turns_directory": "storage/turns",
+    "log_path": "artifacts/logs/voice.jsonl"
+  }
+}

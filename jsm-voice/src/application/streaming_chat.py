@@ -7,10 +7,13 @@ from src.llm.models import ConversationMessage
 from src.streaming.capture import NoSpeechTimeout, capture_utterance, save_utterance
 from src.streaming.config import StreamingConfig
 from src.timing import StageTimer, measure_turn
+from pathlib import Path
+from src.paths import PROJECT_ROOT
 
 
 def run_streaming_chat(service: VoiceTurnService, devices: DeviceConfig,
-                       streaming: StreamingConfig, barge_in: bool = False) -> None:
+                       streaming: StreamingConfig, barge_in: bool = False,
+                       recording_directory: Path = PROJECT_ROOT / "storage/recordings") -> None:
     playback = AudioPlayback(devices.output_device)
     history: tuple[ConversationMessage, ...] = ()
     pending = None
@@ -27,7 +30,7 @@ def run_streaming_chat(service: VoiceTurnService, devices: DeviceConfig,
                         print("Listening timed out.")
                         break
                     pending = None
-                    path = save_utterance(utterance)
+                    path = save_utterance(utterance, recording_directory)
                     try:
                         result = service.run(path, history)
                     except ValueError as error:
