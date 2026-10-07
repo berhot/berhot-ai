@@ -20,8 +20,10 @@ import { failureText, Ltr } from "./primitives";
 import { focusRing, note, quietButton } from "./styles";
 import { SystemSection } from "./system-section";
 import { TrainingSection } from "./training-section";
+import { VoiceSection } from "./voice-section";
+import { useVoiceStrings } from "../../../../shared/voice-strings";
 
-const SECTIONS = ["overview", "models", "training", "data", "system"] as const;
+const SECTIONS = ["overview", "models", "voice", "voice-activity", "training", "data", "system"] as const;
 
 type SectionId = (typeof SECTIONS)[number];
 
@@ -79,8 +81,8 @@ function ApiStatus({ health }: { health: Resource<Health> }) {
 }
 
 export function Console() {
-  // TODO(security): production /admin MUST require authentication and authorization.
   const t = useStrings();
+  const voiceText = useVoiceStrings();
   const section = useSyncExternalStore(subscribeToHash, sectionFromHash, defaultSection);
   // Narrow screens tuck the theme and language controls behind a toggle.
   const [preferencesOpen, setPreferencesOpen] = useState(false);
@@ -147,7 +149,7 @@ export function Console() {
                     >
                       {String(index + 1).padStart(2, "0")}
                     </span>
-                    {t.nav[id]}
+                    {id === "voice" ? voiceText.voiceTitle : id === "voice-activity" ? voiceText.activityTitle : t.nav[id]}
                   </a>
                 </li>
               );
@@ -204,6 +206,8 @@ export function Console() {
           {section === "training" && <TrainingSection runs={runs} />}
           {section === "data" && <DataSection data={data} />}
           {section === "system" && <SystemSection health={health} overview={overview} />}
+          {section === "voice" && <VoiceSection />}
+          {section === "voice-activity" && <VoiceSection activity />}
         </main>
 
         <footer className="mx-auto flex w-full max-w-[82rem] flex-wrap items-center justify-between gap-x-6 gap-y-2 border-t border-line px-4 py-4 sm:px-6 md:px-8">

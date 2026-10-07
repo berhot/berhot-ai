@@ -15,7 +15,7 @@ const en = {
     refreshAll: "Refresh all data",
     openChat: "Open chat",
     notice:
-      "Internal console · read-only · not authenticated yet — for use on localhost only.",
+      "Internal console · live operational data · operator access is controlled by the API server.",
     preferences: "Display settings",
     theme: "Theme",
     themes: { system: "System", light: "Light", dark: "Dark" },
@@ -171,7 +171,7 @@ const ar: Strings = {
     refreshAll: "تحديث جميع البيانات",
     openChat: "فتح المحادثة",
     notice:
-      "لوحة داخلية · للقراءة فقط · بلا مصادقة حتى الآن — للاستخدام على localhost فقط.",
+      "لوحة داخلية · بيانات تشغيل مباشرة · يتحكم خادم API في وصول المشغّل.",
     preferences: "إعدادات العرض",
     theme: "المظهر",
     themes: { system: "النظام", light: "فاتح", dark: "داكن" },

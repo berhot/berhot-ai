@@ -10,8 +10,12 @@
   "scripts": {
     "build": "npm run build --workspaces",
     "lint": "npm run lint --workspaces",
+    "test:e2e": "playwright test",
     "dev:website": "npm run dev --workspace @jsm/website-web",
     "dev:chat": "npm run dev --workspace @jsm/chat-web",
     "dev:admin": "npm run dev --workspace @jsm/admin-console-web"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0"
   }
 }

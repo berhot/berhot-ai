@@ -11,3 +11,6 @@ next-env.d.ts
 .DS_Store
 npm-debug.log*
 .env*
+test-results/
+playwright-report/
+debug.log

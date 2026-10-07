@@ -4,6 +4,7 @@ import { useStrings } from "@/lib/i18n";
 import type { ModelsState } from "@/lib/use-models";
 import { ModelsError, ModelsLoading, NoModels } from "./model-states";
 import { focusRing } from "./styles";
+import { useVoiceStrings } from "../../../../shared/voice-strings";
 
 // Arabic first: it is what the model was mostly trained on.
 const EXAMPLES = ["علي حسن", "مشروع", "Once upon a time"];
@@ -18,9 +19,10 @@ type Props = {
 /** A nearly blank page: one line and a few prompts to start from. */
 export function EmptyState({ state, hasModel, onExample, onRetry }: Props) {
   const t = useStrings();
+  const v = useVoiceStrings();
 
   return (
-    <section className="flex flex-1 flex-col justify-end pt-10 pb-8 motion-safe:animate-rise">
+    <section className="flex flex-1 flex-col justify-center py-12 motion-safe:animate-rise">
       {state.status === "loading" && <ModelsLoading />}
       {state.status === "error" && (
         <ModelsError failure={state.failure} onRetry={onRetry} />
@@ -29,7 +31,8 @@ export function EmptyState({ state, hasModel, onExample, onRetry }: Props) {
 
       {hasModel && (
         <>
-          <p className="text-[17px] leading-7 text-muted">{t.greeting}</p>
+          <h2 className="text-3xl font-medium leading-relaxed text-paper">{v.empty}</h2>
+          <p className="mt-3 text-[16px] leading-7 text-muted">{v.hint}</p>
           <ul aria-label={t.examples} className="mt-4 flex flex-wrap gap-2">
             {EXAMPLES.map((example) => (
               <li key={example}>

@@ -1,9 +1,10 @@
 "use client";
 
-import { useLayoutEffect, type KeyboardEvent, type RefObject } from "react";
+import { useLayoutEffect, type KeyboardEvent, type RefObject, type ReactNode } from "react";
 import { useStrings } from "@/lib/i18n";
 import { SendIcon } from "./icons";
 import { focusRing } from "./styles";
+import { useVoiceStrings } from "../../../../shared/voice-strings";
 
 type Props = {
   textareaRef: RefObject<HTMLTextAreaElement | null>;
@@ -12,6 +13,8 @@ type Props = {
   onSend: () => void;
   canSend: boolean;
   hasModel: boolean;
+  controls?: ReactNode;
+  disabled?: boolean;
 };
 
 const MAX_HEIGHT = 220;
@@ -23,8 +26,11 @@ export function Composer({
   onSend,
   canSend,
   hasModel,
+  controls,
+  disabled,
 }: Props) {
   const t = useStrings();
+  const v = useVoiceStrings();
 
   // Grow with the content, up to a limit, then scroll.
   useLayoutEffect(() => {
@@ -45,7 +51,7 @@ export function Composer({
   }
 
   return (
-    <footer className="shrink-0 border-t border-line bg-ink">
+    <footer className="shrink-0 bg-ink">
       <form
         onSubmit={(event) => {
           event.preventDefault();
@@ -53,27 +59,33 @@ export function Composer({
         }}
         className="mx-auto w-full max-w-[48rem] px-4 pt-3 pb-3 sm:px-6 sm:pb-4"
       >
-        <div className="flex items-end gap-2 rounded-[7px] border border-line-strong bg-surface p-1.5 transition-colors focus-within:border-amber focus-within:ring-1 focus-within:ring-amber/40">
+        <div className="rounded-3xl border border-line-strong bg-surface p-3 shadow-sm transition-colors focus-within:border-amber focus-within:ring-1 focus-within:ring-amber/40">
+          <div className="flex items-end gap-2">
           <textarea
             ref={textareaRef}
             dir="auto"
             rows={1}
             value={value}
+            disabled={disabled}
+            maxLength={4000}
             onChange={(event) => onChange(event.target.value)}
             onKeyDown={onKeyDown}
             aria-label={t.prompt}
-            placeholder={hasModel ? t.placeholder : t.noModelAvailable}
+            placeholder={hasModel ? v.placeholder : t.noModelAvailable}
             className="min-h-10 min-w-0 flex-1 resize-none bg-transparent px-2.5 py-2 text-[16px] leading-6 text-paper outline-none placeholder:text-faint"
           />
           <button
             type="submit"
             disabled={!canSend}
-            className={`flex h-10 shrink-0 items-center gap-1.5 rounded-[5px] bg-amber px-3.5 text-[13px] font-semibold text-amber-ink transition-colors hover:bg-amber-bright active:translate-y-px disabled:pointer-events-none disabled:bg-raised disabled:text-faint ${focusRing}`}
+            aria-label={t.send}
+            className={`flex size-10 shrink-0 items-center justify-center rounded-full bg-amber text-amber-ink transition-colors hover:bg-amber-bright disabled:pointer-events-none disabled:bg-raised disabled:text-faint ${focusRing}`}
           >
             <SendIcon />
-            {t.send}
           </button>
+          </div>
+          {controls}
         </div>
+        <p className="mt-2 text-center text-[11px] text-faint">{v.quality}</p>
         <p className="mt-2 hidden text-[12px] text-faint sm:block">
           <kbd dir="ltr" className="font-mono text-[11px]">Enter</kbd>{" "}
           {t.hintSend}

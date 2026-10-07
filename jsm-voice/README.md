@@ -2,6 +2,14 @@
 
 JSM Voice is a local modular Arabic voice assistant foundation. It reads or records audio, standardizes it, detects speech, transcribes Arabic, calls the existing JSM text API, and synthesizes a response WAV. The current tiny JSM checkpoint validates the pipeline but does not produce dependable conversation. The Piper voice is Jordanian Arabic, not a claimed Saudi voice.
 
+The JSM web apps now integrate this pipeline at `/chat/`, with voice operations at
+`/admin/#voice` and `/admin/#voice-activity`. The text API owns a persistent private
+`scripts.web_worker` process using this environment. Web turns use isolated,
+temporary artifact directories and delete them after processing. See the
+[integrated apps guide](../jsm_0.1/apps/README.md) for startup, access controls,
+browser recording, deployment boundaries, and tests. The CLI behavior below is
+unchanged.
+
 ## Setup
 
 Run commands from `jsm-voice` with its Python environment active. This implementation was validated with Python 3.14 on Windows.

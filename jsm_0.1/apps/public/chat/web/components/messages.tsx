@@ -3,6 +3,7 @@
 import { describeFailure, useStrings, type Failure } from "@/lib/i18n";
 import { formatTemperature } from "@/lib/settings";
 import { eyebrow } from "./styles";
+import { useVoiceStrings } from "../../../../shared/voice-strings";
 
 export type ChatMessage =
   | { id: number; role: "user"; text: string }
@@ -19,6 +20,8 @@ export type ChatMessage =
       text: string;
       /** Why it failed, once `status` is "error". */
       failure: Failure | null;
+      audioUrl?: string;
+      latencyMs?: number;
     };
 
 // Model output is unpredictable: keep its whitespace, never let it overflow.
@@ -47,6 +50,7 @@ export function Specimen({
 }) {
   const t = useStrings();
   const { status, text } = message;
+  const v = useVoiceStrings();
   const isError = status === "error";
 
   return (
@@ -119,6 +123,10 @@ export function Specimen({
             </p>
           </div>
         )}
+        {status === "done" && message.audioUrl && <div className="mt-4 space-y-2">
+          <p className="text-xs text-faint">{v.synthetic}{message.latencyMs !== undefined ? ` · ${(message.latencyMs / 1000).toFixed(1)} s` : ""}</p>
+          <audio controls autoPlay src={message.audioUrl} className="h-10 w-full max-w-sm" aria-label={v.synthetic} />
+        </div>}
       </div>
     </article>
   );

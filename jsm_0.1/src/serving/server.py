@@ -1,10 +1,16 @@
 import threading
+import os
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
+from starlette.middleware.trustedhost import TrustedHostMiddleware
+from src.serving.access import AccessBoundary, validate_access_config
+from src.serving.chat_api import create_chat_router
+from src.serving.voice_runtime import VoiceRuntime
 
 from paths import (
     ADMIN_CONSOLE_BUILD_DIR,
@@ -25,7 +31,7 @@ from src.training.trainer import get_device
 
 
 class GenerateRequest(BaseModel):
-    prompt: str = Field(min_length=1)
+    prompt: str = Field(min_length=1, max_length=40000)
     # Omitted -> the latest model.
     model: str | None = None
     max_new_tokens: int = Field(default=50, ge=1, le=2048)
@@ -50,11 +56,28 @@ model_manager = ModelManager(
 generation_lock = threading.Lock()
 
 
+voice_runtime = VoiceRuntime()
+
+
+@asynccontextmanager
+async def lifespan(app):
+    validate_access_config()
+    voice_runtime.start()
+    try:
+        yield
+    finally:
+        voice_runtime.close()
+
+
 app = FastAPI(
     title="JSM API",
     version="0.1.0",
     openapi_url="/api-schema.json",
+    lifespan=lifespan,
 )
+app.add_middleware(AccessBoundary)
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=os.environ.get(
+    "JSM_ALLOWED_HOSTS", "127.0.0.1,localhost,[::1],testserver").split(","))
 
 
 @app.get("/health")
@@ -110,15 +133,16 @@ def generate_text(
             detail=str(error),
         )
 
+    if not generation_lock.acquire(blocking=False):
+        raise HTTPException(429, "The text model is busy. Try again shortly.", headers={"Retry-After": "2"})
     try:
-        with generation_lock:
-            text = generate(
-                model=model,
-                tokenizer=tokenizer,
-                prompt=request.prompt,
-                max_new_tokens=request.max_new_tokens,
-                temperature=request.temperature,
-            )
+        text = generate(
+            model=model,
+            tokenizer=tokenizer,
+            prompt=request.prompt,
+            max_new_tokens=request.max_new_tokens,
+            temperature=request.temperature,
+        )
 
     except Exception as error:
         raise HTTPException(
@@ -128,6 +152,8 @@ def generate_text(
                 f"{type(error).__name__}: {error}"
             ),
         )
+    finally:
+        generation_lock.release()
 
     return GenerateResponse(
         model=model_id,
@@ -141,6 +167,7 @@ app.include_router(
         device=device,
     )
 )
+app.include_router(create_chat_router(voice_runtime, generate_text, GenerateRequest))
 
 
 # --------------------------------------------------
@@ -192,9 +219,7 @@ def mount_app(
         )
 
 
-# TODO(security): /admin has no authentication on localhost.
-# In production it MUST require authentication and
-# authorization, like the /admin API routes.
+# AccessBoundary protects both the static console and its JSON routes.
 mount_app("/admin", ADMIN_CONSOLE_BUILD_DIR, "admin console")
 mount_app("/chat", CHAT_BUILD_DIR, "chat")
 

@@ -2,13 +2,15 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
-  continuationOf,
   defaultModel,
   failureOf,
-  generate,
   modelReadout,
 } from "@/lib/api";
-import { useStrings, type Failure } from "@/lib/i18n";
+import { useStrings } from "@/lib/i18n";
+import { VoiceRecorder } from "@/lib/recorder";
+import { fetchVoiceStatus, sendChat, sendVoice, replyAudio, type VoiceStatus, type HistoryMessage } from "../../../../shared/voice-api";
+import { useVoiceStrings } from "../../../../shared/voice-strings";
+import { VoiceControls } from "./voice-controls";
 import {
   DEFAULT_SETTINGS,
   resolveMaxNewTokens,
@@ -28,6 +30,7 @@ import { focusRing, headerControl } from "./styles";
 
 export function Chat() {
   const t = useStrings();
+  const v = useVoiceStrings();
   const { state: modelsState, retry } = useModels();
   // Empty until the user picks one; the latest model stands in until then.
   const [pickedId, setPickedId] = useState("");
@@ -35,11 +38,36 @@ export function Chat() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [generating, setGenerating] = useState(false);
+  const [mode, setMode] = useState<"text" | "voice">("text");
+  const [voiceStatus, setVoiceStatus] = useState<VoiceStatus | null>(null);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
+  const [consent, setConsent] = useState(false);
+  const [phase, setPhase] = useState<"idle" | "permission" | "recording" | "processing">("idle");
+  const recorder = useRef<VoiceRecorder | null>(null);
+  const recordingAttempt = useRef(0);
+  const active = useRef<AbortController | null>(null);
+  const audioUrls = useRef<string[]>([]);
 
   const nextId = useRef(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const aboutRef = useRef<HTMLDialogElement>(null);
+
+  useEffect(() => {
+    const attempts = recordingAttempt;
+    let mounted = true;
+    async function refresh() {
+      try { const status = await fetchVoiceStatus(); if (mounted) setVoiceStatus(status); }
+      catch { if (mounted) setVoiceStatus(null); }
+    }
+    void refresh();
+    const timer = setInterval(refresh, 5000);
+    return () => {
+      mounted = false; clearInterval(timer); attempts.current++;
+      recorder.current?.close(); active.current?.abort();
+      audioUrls.current.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, []);
 
   // Keep the newest message in view.
   useEffect(() => {
@@ -52,15 +80,24 @@ export function Chat() {
   const selected =
     models.find((model) => model.id === pickedId) ?? defaultModel(models);
   const readout = selected ? modelReadout(selected) : [];
-  const canSend = draft.trim() !== "" && !generating && selected !== null;
+  const canSend = draft.trim() !== "" && !generating && phase === "idle" && selected !== null;
 
-  async function send() {
-    if (!canSend || !selected) return;
+  async function send(audio?: Blob) {
+    if ((!audio && !canSend) || !selected || active.current || (audio && !consent)) return;
 
-    const prompt = draft;
+    const prompt = audio ? v.recorded : draft;
     // Settings are resolved now, at send time, not when they were typed.
     const temperature = resolveTemperature(settings.temperature);
     const maxNewTokens = resolveMaxNewTokens(settings.maxNewTokens);
+    const history: HistoryMessage[] = messages.flatMap((message, index): HistoryMessage[] => {
+      const user = messages[index - 1];
+      if (message.role !== "assistant" || message.status !== "done" || user?.role !== "user") return [];
+      return [{ role: "user", text: user.text.slice(0, 4000) }, { role: "assistant", text: message.text.slice(0, 4000) }];
+    }).slice(-8);
+    const options = { model: selected.id, temperature, max_new_tokens: Math.min(512, maxNewTokens), history };
+    const controller = new AbortController();
+    active.current = controller;
+    document.querySelectorAll("audio").forEach((player) => player.pause());
     const replyId = nextId.current + 1;
     nextId.current += 2;
 
@@ -81,35 +118,67 @@ export function Chat() {
     ]);
     setDraft("");
     setGenerating(true);
-
-    let outcome:
-      | { status: "done"; text: string }
-      | { status: "error"; failure: Failure };
+    setVoiceError(null);
+    if (audio) setPhase("processing");
     try {
-      const text = await generate({
-        prompt,
-        model: selected.id,
-        temperature,
-        max_new_tokens: maxNewTokens,
-      });
-      outcome = { status: "done", text: continuationOf(prompt, text) };
+      const voice = audio ? await sendVoice(audio, options, controller.signal) : null;
+      const result = voice ?? await sendChat(prompt, options, controller.signal);
+      if (active.current !== controller) return;
+      const audioUrl = voice ? replyAudio(voice.audio) : undefined;
+      if (audioUrl) audioUrls.current.push(audioUrl);
+      setMessages((current) => current.map((message) => {
+        if (message.id === replyId - 1 && voice) return { ...message, text: voice.transcript };
+        if (message.id === replyId && message.role === "assistant") return {
+          ...message, status: "done", text: result.text, audioUrl, latencyMs: voice?.timings.total,
+        };
+        return message;
+      }));
     } catch (error) {
-      outcome = { status: "error", failure: failureOf(error) };
+      if (active.current !== controller) return;
+      setMessages((current) => current.map((message) => message.id === replyId && message.role === "assistant"
+        ? { ...message, status: "error", failure: failureOf(error) } : message));
+    } finally {
+      if (active.current === controller) {
+        active.current = null; setGenerating(false); setPhase("idle"); textareaRef.current?.focus();
+        if (audio) void fetchVoiceStatus().then(setVoiceStatus).catch(() => setVoiceStatus(null));
+      }
     }
+  }
 
-    // A reply cleared mid-flight is simply not found here.
-    setMessages((current) =>
-      current.map((message) =>
-        message.id === replyId && message.role === "assistant"
-          ? { ...message, ...outcome }
-          : message,
-      ),
-    );
-    setGenerating(false);
-    textareaRef.current?.focus();
+  function cancel() {
+    recordingAttempt.current++;
+    recorder.current?.close(); recorder.current = null;
+    active.current?.abort(); active.current = null;
+    setGenerating(false); setPhase("idle");
+    setMessages((current) => current.map((message) => message.role === "assistant" && message.status === "pending"
+      ? { ...message, status: "error", failure: { detail: v.stopped, status: null } } : message));
+  }
+
+  async function startRecording() {
+    if (!consent || phase !== "idle" || generating) return;
+    const attempt = ++recordingAttempt.current;
+    setVoiceError(null); setPhase("permission");
+    document.querySelectorAll("audio").forEach((player) => player.pause());
+    try {
+      const captured = await VoiceRecorder.start(stopRecording);
+      if (attempt !== recordingAttempt.current) { captured.close(); return; }
+      recorder.current = captured; setPhase("recording");
+    } catch (error) {
+      if (attempt !== recordingAttempt.current) return;
+      setPhase("idle"); setVoiceError(error instanceof Error ? `${v.permission} ${error.message}` : v.permission);
+    }
+  }
+
+  function stopRecording() {
+    const captured = recorder.current;
+    if (!captured) return;
+    recorder.current = null;
+    void send(captured.stop());
   }
 
   function clearChat() {
+    cancel();
+    audioUrls.current.forEach((url) => URL.revokeObjectURL(url)); audioUrls.current = [];
     setMessages([]);
     textareaRef.current?.focus();
   }
@@ -210,9 +279,14 @@ export function Chat() {
         textareaRef={textareaRef}
         value={draft}
         onChange={setDraft}
-        onSend={send}
+        onSend={() => void send()}
         canSend={canSend}
         hasModel={selected !== null}
+        disabled={phase === "recording" || phase === "permission"}
+        controls={<VoiceControls mode={mode} onMode={setMode} status={voiceStatus} error={voiceError}
+          phase={phase} consent={consent} onConsent={setConsent} busy={generating} hasModel={selected !== null}
+          onRecord={startRecording} onStop={stopRecording} onCancel={cancel} onFile={(file) => void send(file)}
+          onRefresh={() => { void fetchVoiceStatus().then(setVoiceStatus).catch((error) => setVoiceError(String(error))); }} />}
       />
 
       <AboutDialog dialogRef={aboutRef} model={selected} />
