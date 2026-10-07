@@ -36,6 +36,8 @@ class GenerateRequest(BaseModel):
     model: str | None = None
     max_new_tokens: int = Field(default=50, ge=1, le=2048)
     temperature: float = Field(default=0.0, ge=0.0, le=5.0)
+    # Answer on a new line and stop at the end of it.
+    reply: bool = False
 
 
 class GenerateResponse(BaseModel):
@@ -142,6 +144,7 @@ def generate_text(
             prompt=request.prompt,
             max_new_tokens=request.max_new_tokens,
             temperature=request.temperature,
+            reply=request.reply,
         )
 
     except Exception as error:

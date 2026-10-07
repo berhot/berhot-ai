@@ -28,7 +28,14 @@ VALIDATION_PATH = (
 if __name__ == "__main__":
     training_config = load_training_config()
 
-    model_config = ModelConfig()
+    # Sizes come from training.json; anything left out
+    # keeps the ModelConfig default.
+    model_config = ModelConfig(
+        **training_config.get(
+            "model",
+            {},
+        )
+    )
 
     model = TinyLLM(
         model_config

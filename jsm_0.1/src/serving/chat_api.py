@@ -30,10 +30,8 @@ class VoiceRequest(TurnOptions):
 def conversation_prompt(prompt, history):
     if not prompt.strip():
         raise HTTPException(422, "Enter a message first.")
-    if not history:
-        return prompt.strip()
-    return "\n".join([*(f"{item.role}: {item.text}" for item in history),
-                      f"user: {prompt.strip()}", "assistant:"])
+    # One turn per line, the way conversations are written in the training data.
+    return "\n".join([*(" ".join(item.text.split()) for item in history), " ".join(prompt.split())])
 
 
 def create_chat_router(runtime, generate_text, request_type):
@@ -42,7 +40,8 @@ def create_chat_router(runtime, generate_text, request_type):
     def reply(text, options):
         prompt = conversation_prompt(text, options.history)
         result = generate_text(request_type(prompt=prompt, model=options.model,
-                              temperature=options.temperature, max_new_tokens=options.max_new_tokens))
+                              temperature=options.temperature, max_new_tokens=options.max_new_tokens,
+                              reply=True))
         if not result.text.startswith(prompt):
             raise HTTPException(502, "The text model returned an invalid response.")
         text = result.text[len(prompt):].strip()

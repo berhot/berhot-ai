@@ -110,3 +110,88 @@ def make_training_examples(
             )
 
             yield x, y
+
+
+def load_token_stream(
+    path: Path,
+) -> torch.Tensor:
+    """
+    All tokenized documents joined into one sequence.
+
+    Documents keep their BOS and EOS tokens, so the
+    model still sees where each one starts and ends.
+    """
+    token_ids: list[int] = []
+
+    for sequence in load_token_sequences(path):
+        token_ids.extend(sequence)
+
+    return torch.tensor(
+        token_ids,
+        dtype=torch.long,
+    )
+
+
+def make_training_batches(
+    token_stream: torch.Tensor,
+    context_length: int,
+    batch_size: int,
+) -> Iterator[
+    tuple[torch.Tensor, torch.Tensor]
+]:
+    """
+    Shuffled next-token batches covering the stream once.
+
+    A random starting offset moves the window boundaries
+    every epoch, so the model does not see the same
+    fixed chunks each time.
+    """
+    window = context_length + 1
+
+    if len(token_stream) < window:
+        # A corpus shorter than one window is
+        # still a single, shorter example.
+        if len(token_stream) >= 2:
+            yield (
+                token_stream[:-1].unsqueeze(0),
+                token_stream[1:].unsqueeze(0),
+            )
+
+        return
+
+    offset = int(
+        torch.randint(
+            0,
+            context_length,
+            (1,),
+        )
+    )
+
+    starts = torch.arange(
+        offset,
+        len(token_stream) - window + 1,
+        context_length,
+    )
+
+    if len(starts) == 0:
+        starts = torch.tensor([0])
+
+    starts = starts[
+        torch.randperm(len(starts))
+    ]
+
+    for index in range(
+        0,
+        len(starts),
+        batch_size,
+    ):
+        batch = torch.stack(
+            [
+                token_stream[start:start + window]
+                for start in starts[
+                    index:index + batch_size
+                ].tolist()
+            ]
+        )
+
+        yield batch[:, :-1], batch[:, 1:]

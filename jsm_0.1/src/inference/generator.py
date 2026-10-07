@@ -114,6 +114,37 @@ def apply_repetition_penalty(
     return penalized
 
 
+def apply_reply_constraint(
+    logits: torch.Tensor,
+    tokenizer: Tokenizer,
+    newline_token_ids: list[int],
+    first_step: bool,
+    reply_started: bool,
+) -> torch.Tensor:
+    constrained = logits.clone()
+
+    if first_step:
+        # The reply must open a new line.
+        allowed = torch.full_like(
+            constrained,
+            float("-inf"),
+        )
+
+        allowed[newline_token_ids] = (
+            constrained[newline_token_ids]
+        )
+
+        return allowed
+
+    if not reply_started:
+        # No empty replies: the line needs some text
+        # before it is allowed to end.
+        constrained[newline_token_ids] = float("-inf")
+        constrained[tokenizer.eos_id] = float("-inf")
+
+    return constrained
+
+
 @torch.no_grad()
 def generate(
     model: TinyLLM,
@@ -122,7 +153,13 @@ def generate(
     max_new_tokens: int = 50,
     temperature: float = 1.0,
     repetition_penalty: float = 1.3,
+    reply: bool = False,
 ) -> str:
+    """
+    With reply=True the model answers on a new line and
+    stops at the end of that line, which is how turns are
+    written in the conversation training data.
+    """
 
     if repetition_penalty < 1.0:
         raise ValueError(
@@ -149,7 +186,19 @@ def generate(
         token_ids
     )
 
-    for _ in range(max_new_tokens):
+    newline_token_ids = [
+        token_id
+        for token_id in range(
+            tokenizer.vocab_size
+        )
+        if b"\n" in tokenizer.token_to_bytes(
+            token_id
+        )
+    ]
+
+    reply_bytes = b""
+
+    for step in range(max_new_tokens):
         context = token_ids[
             -model.config.context_length:
         ]
@@ -173,6 +222,19 @@ def generate(
                 current_bytes=current_bytes,
             )
         )
+
+        if reply:
+            next_token_logits = (
+                apply_reply_constraint(
+                    logits=next_token_logits,
+                    tokenizer=tokenizer,
+                    newline_token_ids=newline_token_ids,
+                    first_step=step == 0,
+                    reply_started=bool(
+                        reply_bytes.strip()
+                    ),
+                )
+            )
 
         # Applied to the tokens the model can currently
         # see, so a loop in the prompt is not continued.
@@ -212,11 +274,22 @@ def generate(
         if next_token_id == tokenizer.eos_id:
             break
 
-        current_bytes += (
-            tokenizer.token_to_bytes(
-                next_token_id
-            )
+        next_bytes = tokenizer.token_to_bytes(
+            next_token_id
         )
+
+        # A second newline starts the other speaker's
+        # turn, so the reply is complete.
+        if (
+            reply
+            and step > 0
+            and b"\n" in next_bytes
+        ):
+            token_ids.pop()
+            break
+
+        current_bytes += next_bytes
+        reply_bytes += next_bytes
 
     # The token budget can run out in the middle of a
     # UTF-8 character. Drop the unfinished tail so the

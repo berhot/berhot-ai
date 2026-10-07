@@ -41,7 +41,8 @@ def test_text_and_voice_use_selected_model_and_history(client):
     options = {"model": "selected.pt", "history": [{"role": "user", "text": "earlier"}]}
     text = connection.post("/api/chat", json={**options, "prompt": "now"})
     assert text.json() == {"text": "answer", "model": "selected.pt"}
-    assert calls[-1].prompt == "user: earlier\nuser: now\nassistant:"
+    assert calls[-1].prompt == "earlier\nnow"
+    assert calls[-1].reply is True
     voice = connection.post("/api/voice/turn", json={**options, "audio": "A" * 64, "consent": True})
     assert voice.status_code == 200
     assert calls[-1].model == "selected.pt"

@@ -1,10 +1,14 @@
+import math
 import time
 from pathlib import Path
 
 import torch
 from torch import nn
 
-from src.dataset.loader import make_training_examples
+from src.dataset.loader import (
+    load_token_stream,
+    make_training_batches,
+)
 from src.evaluation.evaluator import evaluate
 from src.model.config import ModelConfig
 from src.model.model import TinyLLM
@@ -41,6 +45,10 @@ def train(
     optimizer = torch.optim.AdamW(
         model.parameters(),
         lr=learning_rate,
+        weight_decay=training_config.get(
+            "weight_decay",
+            0.01,
+        ),
     )
 
     loss_function = nn.CrossEntropyLoss()
@@ -147,6 +155,67 @@ def train(
     )
 
     last_saved_epoch = start_epoch
+    last_epoch = start_epoch
+
+    batch_size = training_config.get(
+        "batch_size",
+        1,
+    )
+
+    warmup_steps = training_config.get(
+        "warmup_steps",
+        0,
+    )
+
+    gradient_clip = training_config.get(
+        "gradient_clip"
+    )
+
+    max_training_minutes = training_config.get(
+        "max_training_minutes"
+    )
+
+    early_stopping_patience = training_config.get(
+        "early_stopping_patience"
+    )
+
+    epochs_without_improvement = 0
+
+    token_stream = load_token_stream(
+        train_path
+    )
+
+    steps_per_epoch = max(
+        (len(token_stream) - 1)
+        // (config.context_length * batch_size),
+        1,
+    )
+
+    total_steps = epochs * steps_per_epoch
+
+    def scheduled_learning_rate(
+        step: int,
+    ) -> float:
+        # Linear warmup, then cosine decay to 10%.
+        if step < warmup_steps:
+            return (
+                learning_rate
+                * (step + 1)
+                / warmup_steps
+            )
+
+        progress = min(
+            (step - warmup_steps)
+            / max(total_steps - warmup_steps, 1),
+            1.0,
+        )
+
+        return learning_rate * (
+            0.1
+            + 0.9
+            * 0.5
+            * (1.0 + math.cos(math.pi * progress))
+        )
 
     # --------------------------------------------------
     # Training
@@ -159,12 +228,18 @@ def train(
         total_loss = 0.0
         steps_this_epoch = 0
 
-        for x, y in make_training_examples(
-            path=train_path,
+        for x, y in make_training_batches(
+            token_stream=token_stream,
             context_length=config.context_length,
+            batch_size=batch_size,
         ):
-            x = x.unsqueeze(0).to(device)
-            y = y.unsqueeze(0).to(device)
+            x = x.to(device)
+            y = y.to(device)
+
+            for group in optimizer.param_groups:
+                group["lr"] = scheduled_learning_rate(
+                    global_step
+                )
 
             optimizer.zero_grad()
 
@@ -179,6 +254,12 @@ def train(
             )
 
             loss.backward()
+
+            if gradient_clip is not None:
+                nn.utils.clip_grad_norm_(
+                    model.parameters(),
+                    gradient_clip,
+                )
 
             optimizer.step()
 
@@ -281,6 +362,37 @@ def train(
 
             last_saved_epoch = epoch
 
+            epochs_without_improvement = (
+                0
+                if is_best
+                else epochs_without_improvement + 1
+            )
+
+        last_epoch = epoch
+
+        if (
+            early_stopping_patience is not None
+            and epochs_without_improvement
+            >= early_stopping_patience
+        ):
+            print(
+                f"Stopping: validation loss has not "
+                f"improved for "
+                f"{epochs_without_improvement} epochs."
+            )
+            break
+
+        if (
+            max_training_minutes is not None
+            and time.perf_counter() - started_at
+            >= max_training_minutes * 60
+        ):
+            print(
+                f"Stopping: reached the "
+                f"{max_training_minutes}-minute limit."
+            )
+            break
+
     # --------------------------------------------------
     # Final stats
     # --------------------------------------------------
@@ -292,7 +404,7 @@ def train(
     )
 
     final_stats = {
-        "epochs_completed": epochs,
+        "epochs_completed": last_epoch,
         "global_step": global_step,
         "tokens_seen": tokens_seen,
         "training_seconds": training_seconds,
@@ -304,7 +416,7 @@ def train(
 
     # Save the final state if the last epoch
     # was not already checkpointed.
-    if last_saved_epoch != epochs:
+    if last_saved_epoch != last_epoch:
         save_checkpoint(
             path=checkpoint_path,
             model=model,
