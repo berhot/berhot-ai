@@ -17,6 +17,7 @@ def main() -> None:
     parser.add_argument("--max-turns", type=int)
     parser.add_argument("--streaming", action="store_true")
     parser.add_argument("--barge-in", action="store_true", help="Interrupt playback on speech; use headphones.")
+    parser.add_argument("--consent", action="store_true", help="Confirm consent for local microphone recording.")
     args = parser.parse_args()
     try:
         if args.list_devices:
@@ -27,6 +28,8 @@ def main() -> None:
         from src.application.voice_turn import build_voice_service
 
         settings = load_voice_config(args.config)
+        from src.privacy import require_consent
+        require_consent(args.consent, settings.privacy)
         configure_logging(settings.runtime.log_path)
         config = settings.devices
         if args.seconds is not None:
@@ -38,9 +41,10 @@ def main() -> None:
         if args.streaming:
             from src.application.streaming_chat import run_streaming_chat
             run_streaming_chat(build_voice_service(settings), config, settings.streaming, args.barge_in,
-                               settings.runtime.recordings_directory)
+                               settings.runtime.recordings_directory, args.consent, settings.privacy)
         else:
-            run_voice_chat(build_voice_service(settings), config, settings.runtime.recordings_directory)
+            run_voice_chat(build_voice_service(settings), config, settings.runtime.recordings_directory,
+                           args.consent, settings.privacy)
     except (OSError, ValueError, RuntimeError, ImportError) as error:
         parser.exit(2, f"error: {error}\n")
 

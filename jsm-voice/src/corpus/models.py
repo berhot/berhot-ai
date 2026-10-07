@@ -39,13 +39,18 @@ class Annotations:
     dialect: str | None = None
     transcript: dict[str, Any] | None = None
     quality: dict[str, Any] | None = None
+    recording_consent: dict[str, Any] | None = None
+    retention: dict[str, Any] | None = None
+    synthetic: bool | None = None
 
     def __post_init__(self) -> None:
         for name in ("speaker_id", "language", "dialect"):
             value = getattr(self, name)
             if value is not None and (not isinstance(value, str) or not value.strip()):
                 raise ValueError(f"{name} must be a nonempty string or null.")
-        for name in ("provenance", "transcript", "quality"):
+        if self.synthetic is not None and type(self.synthetic) is not bool:
+            raise ValueError("synthetic must be a boolean or null.")
+        for name in ("provenance", "transcript", "quality", "recording_consent", "retention"):
             value = getattr(self, name)
             if value is not None and not isinstance(value, dict):
                 raise ValueError(f"{name} must be an object or null.")

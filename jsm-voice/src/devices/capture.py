@@ -9,6 +9,7 @@ from src.audio.models import AudioMetadata, AudioWaveform
 from src.audio.wav_writer import write_pcm16_wav
 from src.devices.config import DeviceConfig
 from src.timing import StageTimer
+from src.privacy import PrivacyConfig, load_privacy_config, require_consent, require_runtime_path, write_recording_receipt
 
 
 @dataclass(frozen=True)
@@ -23,7 +24,10 @@ class MicrophoneCapture:
         self.config = config
         self.directory = directory.resolve()
 
-    def record(self) -> CaptureResult:
+    def record(self, consent: bool = False, policy: PrivacyConfig | None = None) -> CaptureResult:
+        policy = policy if policy is not None else load_privacy_config()
+        require_consent(consent, policy)
+        require_runtime_path(self.directory, policy.storage_directory)
         rate = self.config.sample_rate_hz
         count = round(rate * self.config.recording_seconds)
         samples: list[int] = []
@@ -40,4 +44,9 @@ class MicrophoneCapture:
         path = self.directory / f"{uuid4().hex}.wav"
         metadata = AudioMetadata(path, rate, 1, 2, len(samples), "NONE", "not compressed")
         write_pcm16_wav(AudioWaveform(metadata, tuple(samples)))
+        try:
+            write_recording_receipt(path, consent, policy)
+        except BaseException:
+            path.unlink(missing_ok=True)
+            raise
         return CaptureResult(path, metadata.duration_seconds, timer.duration_ms)

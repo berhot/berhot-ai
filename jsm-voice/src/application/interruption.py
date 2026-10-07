@@ -11,11 +11,12 @@ from src.devices.playback import AudioPlayback
 from src.streaming.capture import NoSpeechTimeout, capture_utterance
 from src.streaming.config import StreamingConfig
 from src.streaming.models import Utterance
+from src.privacy import PrivacyConfig
 
 
 def play_and_capture(
     path: Path, playback: AudioPlayback, streaming: StreamingConfig, devices: DeviceConfig,
-    turn_id: str,
+    turn_id: str, consent: bool = False, policy: PrivacyConfig | None = None,
 ) -> tuple[Utterance | None, bool]:
     playback_token = CancellationToken()
     context = copy_context()
@@ -31,7 +32,8 @@ def play_and_capture(
                 })
 
         try:
-            utterance = capture_utterance(streaming, devices, on_speech_start=on_speech_start)
+            utterance = capture_utterance(streaming, devices, on_speech_start=on_speech_start,
+                                         consent=consent, policy=policy)
         except NoSpeechTimeout:
             pass
         finally:

@@ -5,6 +5,7 @@ from math import isfinite
 from pathlib import Path
 
 from src.audio.config import PROJECT_ROOT
+from src.privacy import PrivacyConfig
 
 DEFAULT_TTS_CONFIG_PATH = PROJECT_ROOT / "configs/tts.json"
 
@@ -38,7 +39,7 @@ class TTSConfig:
             object.__setattr__(self, name, directory.resolve())
 
 
-def load_tts_config(path: Path = DEFAULT_TTS_CONFIG_PATH) -> TTSConfig:
+def load_tts_config(path: Path = DEFAULT_TTS_CONFIG_PATH, policy: PrivacyConfig | None = None) -> TTSConfig:
     data = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(data, dict) or set(data) - {field.name for field in fields(TTSConfig)}:
         raise ValueError("Invalid TTS configuration keys.")
@@ -46,6 +47,11 @@ def load_tts_config(path: Path = DEFAULT_TTS_CONFIG_PATH) -> TTSConfig:
         if name in data and (not isinstance(data[name], str) or not data[name].strip()):
             raise ValueError(f"{name} must be a nonempty path.")
     try:
-        return TTSConfig(**data)
+        config = TTSConfig(**data)
     except TypeError as error:
         raise ValueError(f"Invalid TTS setting type: {error}") from error
+    from src.privacy import load_privacy_config, require_runtime_path
+    policy = policy if policy is not None else load_privacy_config()
+    require_runtime_path(config.output_directory, policy.storage_directory)
+    require_runtime_path(config.model_directory, policy.artifacts_directory)
+    return config

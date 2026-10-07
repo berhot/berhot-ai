@@ -11,7 +11,7 @@ from pathlib import Path
 from src.audio.config import PROJECT_ROOT
 from src.audio.wav_reader import read_wav
 from src.artifacts import replace_artifact
-from src.corpus.models import AudioArtifact, SegmentRecord, VoiceManifest
+from src.corpus.models import Annotations, AudioArtifact, SegmentRecord, VoiceManifest
 from src.vad.models import SegmentationResult
 
 MANIFEST_DIRECTORY = PROJECT_ROOT / "storage" / "manifests"
@@ -55,18 +55,27 @@ def create_voice_manifest(
 ) -> tuple[Path, VoiceManifest]:
     segmentation = json.loads(result.metadata_path.read_text(encoding="utf-8"))
     source = describe_audio(Path(segmentation["source_path"]))
+    annotations = Annotations()
+    receipt_path = Path(source.path).with_suffix(".recording.json")
+    if receipt_path.is_file():
+        receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+        if receipt.get("origin") == "microphone" and receipt.get("audio_path") == source.path:
+            annotations = Annotations(provenance=receipt["provenance"],
+                                      recording_consent=receipt["recording_consent"],
+                                      retention=receipt["retention"], synthetic=False)
     standardized = describe_audio(result.standardized_path)
     if source.sha256 != result.source_id or standardized.sha256 != segmentation["standardized_sha256"]:
         raise ValueError("Source or standardized audio has changed since segmentation.")
     records = tuple(SegmentRecord(
         segment.segment_id, result.source_id, describe_audio(segment.wav_path),
-        segment.region.start_sample, segment.region.end_sample,
+        segment.region.start_sample, segment.region.end_sample, annotations,
     ) for segment in result.segments)
     timestamp = datetime.now(timezone.utc).isoformat()
     manifest = VoiceManifest(
         result.source_id, source, standardized, records, timestamp, timestamp,
         str(result.metadata_path), segmentation["standardization_version"],
         segmentation["processing_version"],
+        annotations=annotations,
     )
     output = output_directory.resolve() / result.source_id / f"{segmentation['run_id']}.json"
     if output.exists():

@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 from piper import PiperVoice, SynthesisConfig
@@ -9,13 +9,15 @@ from src.audio.wav_writer import write_pcm16_wav
 from src.timing import StageTimer
 from src.tts.config import TTSConfig
 from src.tts.models import SynthesisResult
+from src.privacy import PrivacyConfig, load_privacy_config
 
 
 class PiperTTSBackend:
     """A voice is loaded once; synthesis uses local weights and phonemization."""
 
-    def __init__(self, config: TTSConfig) -> None:
+    def __init__(self, config: TTSConfig, policy: PrivacyConfig | None = None) -> None:
         self.config = config
+        self.policy = policy if policy is not None else load_privacy_config()
         model_path = config.model_directory / f"{config.voice}.onnx"
         if not model_path.is_file() or not model_path.with_suffix(".onnx.json").is_file():
             raise ValueError("Piper voice is missing; run python -m scripts.download_tts_model.")
@@ -42,11 +44,14 @@ class PiperTTSBackend:
                 raise ValueError("Piper produced no audio for this text.")
             metadata = AudioMetadata(path, self._voice.config.sample_rate, 1, 2, len(samples), "NONE", "not compressed")
             write_pcm16_wav(AudioWaveform(metadata, tuple(samples)))
+        created = datetime.now(timezone.utc)
         write_json_artifact(metadata_path, {
             "schema_version": 1, "synthetic": True, "backend": "piper",
             "voice": self.config.voice, "text": text, "audio_path": str(path),
             "sample_rate_hz": metadata.sample_rate_hz, "duration_seconds": metadata.duration_seconds,
-            "created_at": datetime.now(timezone.utc).isoformat(), "latency_ms": timer.duration_ms,
+            "created_at": created.isoformat(), "latency_ms": timer.duration_ms,
+            "retention": {"expires_at": (created + timedelta(days=self.policy.retention_days)).isoformat()},
+            "provenance": {"source_type": "generated", "model_path": str(self.config.model_directory / f"{self.config.voice}.onnx")},
         })
         return SynthesisResult(path, metadata_path, metadata.sample_rate_hz,
                                metadata.duration_seconds, timer.duration_ms, self.config.voice)

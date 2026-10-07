@@ -8,6 +8,7 @@ from src.audio.wav_writer import write_pcm16_wav
 from src.devices.capture import MicrophoneCapture
 from src.devices.config import DeviceConfig
 from src.devices.playback import AudioPlayback
+from src.privacy import PrivacyConfig
 from tests.test_segmentation import waveform
 
 
@@ -31,7 +32,7 @@ class InputStream:
 def test_capture_has_exact_duration_and_closes_stream(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     stream = InputStream()
     monkeypatch.setattr("src.devices.capture.sd.InputStream", lambda **kwargs: stream)
-    result = MicrophoneCapture(DeviceConfig(recording_seconds=0.25), tmp_path).record()
+    result = MicrophoneCapture(DeviceConfig(recording_seconds=0.25), tmp_path).record(True, PrivacyConfig(storage_directory=tmp_path))
     assert read_wav(result.audio_path).metadata.frame_count == 4000
     assert stream.closed
 
@@ -41,7 +42,7 @@ def test_overflow_discards_recording(tmp_path: Path, monkeypatch: pytest.MonkeyP
     stream.overflow = True
     monkeypatch.setattr("src.devices.capture.sd.InputStream", lambda **kwargs: stream)
     with pytest.raises(RuntimeError, match="overflow"):
-        MicrophoneCapture(DeviceConfig(), tmp_path).record()
+        MicrophoneCapture(DeviceConfig(), tmp_path).record(True, PrivacyConfig(storage_directory=tmp_path))
     assert stream.closed and not list(tmp_path.glob("*.wav"))
 
 

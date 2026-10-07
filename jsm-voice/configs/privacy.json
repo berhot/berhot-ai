@@ -1,0 +1,7 @@
+{
+  "require_recording_consent": true,
+  "delete_temporary_recordings": true,
+  "retention_days": 7,
+  "storage_directory": "storage",
+  "artifacts_directory": "artifacts"
+}

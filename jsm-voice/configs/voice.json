@@ -6,6 +6,7 @@
   "tts": "tts.json",
   "devices": "devices.json",
   "streaming": "streaming.json",
+  "privacy": "privacy.json",
   "runtime": {
     "uploads_directory": "storage/uploads",
     "recordings_directory": "storage/recordings",

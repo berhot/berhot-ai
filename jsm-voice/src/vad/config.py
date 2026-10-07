@@ -5,6 +5,7 @@ from dataclasses import dataclass, fields
 from pathlib import Path
 
 from src.audio.config import PROJECT_ROOT
+from src.privacy import PrivacyConfig
 
 DEFAULT_VAD_CONFIG_PATH = PROJECT_ROOT / "configs" / "vad.json"
 
@@ -47,7 +48,7 @@ class VADConfig:
         object.__setattr__(self, "output_directory", directory.resolve())
 
 
-def load_vad_config(path: Path = DEFAULT_VAD_CONFIG_PATH) -> VADConfig:
+def load_vad_config(path: Path = DEFAULT_VAD_CONFIG_PATH, policy: PrivacyConfig | None = None) -> VADConfig:
     data = json.loads(path.read_text(encoding="utf-8"))
     allowed = {field.name for field in fields(VADConfig)}
     if not isinstance(data, dict) or set(data) - allowed:
@@ -57,4 +58,8 @@ def load_vad_config(path: Path = DEFAULT_VAD_CONFIG_PATH) -> VADConfig:
         if not isinstance(directory, str) or not directory.strip():
             raise ValueError("output_directory must be a nonempty path string.")
         data["output_directory"] = Path(directory)
-    return VADConfig(**data)
+    config = VADConfig(**data)
+    from src.privacy import load_privacy_config, require_runtime_path
+    policy = policy if policy is not None else load_privacy_config()
+    require_runtime_path(config.output_directory, policy.storage_directory)
+    return config

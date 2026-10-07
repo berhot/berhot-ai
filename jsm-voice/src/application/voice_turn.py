@@ -83,5 +83,5 @@ def build_voice_service(config: VoiceConfig | None = None) -> VoiceTurnService:
 
     return VoiceTurnService(
         preprocess, FasterWhisperBackend(config.asr),
-        JSMTextModelBackend(config.llm), PiperTTSBackend(config.tts), config.runtime.turns_directory,
+        JSMTextModelBackend(config.llm), PiperTTSBackend(config.tts, config.privacy), config.runtime.turns_directory,
     )

@@ -7,10 +7,14 @@ from src.artifacts import write_json_artifact
 from src.timing import StageTimer, measure_turn
 from pathlib import Path
 from src.paths import PROJECT_ROOT
+from src.privacy import PrivacyConfig, load_privacy_config, require_consent, delete_temporary_recording
 
 
 def run_voice_chat(service: VoiceTurnService, config: DeviceConfig,
-                    recording_directory: Path = PROJECT_ROOT / "storage/recordings") -> None:
+                    recording_directory: Path = PROJECT_ROOT / "storage/recordings",
+                    consent: bool = False, policy: PrivacyConfig | None = None) -> None:
+    policy = policy if policy is not None else load_privacy_config()
+    require_consent(consent, policy)
     capture = MicrophoneCapture(config, recording_directory)
     playback = AudioPlayback(config.output_device)
     history: tuple[ConversationMessage, ...] = ()
@@ -22,13 +26,15 @@ def run_voice_chat(service: VoiceTurnService, config: DeviceConfig,
             with measure_turn() as measurements:
                 with StageTimer("interaction_total"):
                     print("Recording...")
-                    recording = capture.record()
+                    recording = capture.record(consent, policy)
                     print("Processing...")
                     try:
                         result = service.run(recording.audio_path, history)
                     except ValueError as error:
                         print(f"Turn skipped: {error}")
                         continue
+                    finally:
+                        delete_temporary_recording(recording.audio_path, policy)
                     print(f"You: {result.transcript}\nJSM: {result.model_response_text}")
                     print("Playing response...")
                     playback.play(result.generated_speech_path)

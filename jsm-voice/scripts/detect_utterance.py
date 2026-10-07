@@ -9,6 +9,7 @@ from src.streaming.config import DEFAULT_STREAMING_CONFIG_PATH, load_streaming_c
 def main() -> None:
     parser = argparse.ArgumentParser(description="Listen for one complete spoken utterance.")
     parser.add_argument("--config", type=Path, default=DEFAULT_STREAMING_CONFIG_PATH)
+    parser.add_argument("--consent", action="store_true")
     args = parser.parse_args()
     configure_logging()
     try:
@@ -17,8 +18,8 @@ def main() -> None:
 
         print("Listening for speech; Ctrl+C cancels.", flush=True)
         with measure_turn():
-            utterance = capture_utterance(load_streaming_config(args.config), load_device_config())
-        path = save_utterance(utterance)
+            utterance = capture_utterance(load_streaming_config(args.config), load_device_config(), consent=args.consent)
+        path = save_utterance(utterance, consent=args.consent)
     except KeyboardInterrupt:
         print("\nListening cancelled.")
         return

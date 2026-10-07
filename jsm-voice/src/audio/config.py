@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from src.paths import PROJECT_ROOT
+from src.privacy import PrivacyConfig
 DEFAULT_CONFIG_PATH = PROJECT_ROOT / "configs" / "audio.json"
 
 
@@ -33,6 +34,7 @@ class StandardizationConfig:
 
 def load_standardization_config(
     path: Path = DEFAULT_CONFIG_PATH,
+    policy: PrivacyConfig | None = None,
 ) -> StandardizationConfig:
     """Resolve configured relative output paths against the project root."""
     data = json.loads(path.read_text(encoding="utf-8"))
@@ -46,4 +48,8 @@ def load_standardization_config(
         if not isinstance(data["output_directory"], str) or not data["output_directory"].strip():
             raise ValueError("output_directory must be a nonempty path string.")
         data["output_directory"] = Path(data["output_directory"])
-    return StandardizationConfig(**data)
+    config = StandardizationConfig(**data)
+    from src.privacy import load_privacy_config, require_runtime_path
+    policy = policy if policy is not None else load_privacy_config()
+    require_runtime_path(config.output_directory, policy.storage_directory)
+    return config
