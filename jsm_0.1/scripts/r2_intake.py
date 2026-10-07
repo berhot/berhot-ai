@@ -38,14 +38,13 @@ if __name__ == "__main__":
 
     arguments = parser.parse_args()
 
-    prefix = (
+    config = load_config(PROJECT_DIR / ".env")
+    bucket = R2Bucket(config)
+
+    prefix = config.prefix + (
         "uploads/"
         if arguments.day is None
         else f"staged/day_{arguments.day:02d}/"
-    )
-
-    bucket = R2Bucket(
-        load_config(PROJECT_DIR / ".env")
     )
 
     downloaded, present = download_tree(

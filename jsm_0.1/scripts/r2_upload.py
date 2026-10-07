@@ -1,4 +1,5 @@
 import argparse
+import json
 
 from paths import (
     PROJECT_DIR,
@@ -34,9 +35,15 @@ if __name__ == "__main__":
 
     arguments = parser.parse_args()
 
-    bucket = R2Bucket(
-        load_config(PROJECT_DIR / ".env")
-    )
+    config = load_config(PROJECT_DIR / ".env")
+
+    # Only these upload folders are kept in the bucket.
+    sources = json.loads(
+        (PROJECT_DIR / "configs" / "r2.json").read_text(
+            encoding="utf-8"
+        )
+    )["upload_sources"]
+    bucket = R2Bucket(config)
 
     for name, folder in FOLDERS.items():
         if arguments.only not in (None, name):
@@ -49,7 +56,12 @@ if __name__ == "__main__":
         uploaded, present = upload_tree(
             bucket=bucket,
             root=folder,
-            prefix=f"{name}/",
+            prefix=f"{config.prefix}{name}/",
+            folders=(
+                sources
+                if name == "uploads"
+                else None
+            ),
         )
 
         print(

@@ -38,6 +38,8 @@ class R2Config:
     access_key_id: str
     secret_access_key: str
     bucket: str
+    # Folder inside the bucket that holds this project's files.
+    prefix: str = ""
 
     @property
     def host(self) -> str:
@@ -111,6 +113,14 @@ def load_config(
             "R2_SECRET_ACCESS_KEY"
         ],
         bucket=values["R2_BUCKET"],
+        prefix="".join(
+            f"{part}/"
+            for part in values.get(
+                "R2_PREFIX",
+                "",
+            ).split("/")
+            if part
+        ),
     )
 
 
@@ -434,16 +444,26 @@ def upload_tree(
     root: Path,
     prefix: str,
     workers: int = 8,
+    folders: list[str] | None = None,
 ) -> tuple[int, int]:
     """Upload files missing from the bucket, or of a different size.
 
+    With folders, only files inside those top-level folders are sent.
     Returns how many were uploaded and how many were already there.
     """
     remote = bucket.list(prefix)
 
+    files = {
+        name: path
+        for name, path in local_files(root).items()
+        if folders is None
+        or name.split("/")[0] in folders
+        and "/" in name
+    }
+
     pending = [
         (prefix + name, path)
-        for name, path in local_files(root).items()
+        for name, path in files.items()
         if remote.get(prefix + name)
         != path.stat().st_size
     ]
@@ -456,7 +476,7 @@ def upload_tree(
 
     return (
         len(pending),
-        len(local_files(root)) - len(pending),
+        len(files) - len(pending),
     )
 
 

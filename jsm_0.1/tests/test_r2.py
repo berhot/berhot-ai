@@ -112,6 +112,18 @@ def test_config_needs_every_setting(tmp_path):
     )
 
     assert config.bucket == "other"
+    assert config.prefix == ""
+
+    shared = r2.load_config(
+        env_file,
+        environment={
+            "R2_ACCESS_KEY_ID": "key",
+            "R2_SECRET_ACCESS_KEY": "secret",
+            "R2_PREFIX": "/berhot-ai",
+        },
+    )
+
+    assert shared.prefix == "berhot-ai/"
     assert config.host == "abc.r2.cloudflarestorage.com"
 
 
@@ -174,3 +186,19 @@ def test_download_places_a_day_batch_under_uploads(tmp_path):
     assert (tmp_path / "wiki" / "new.txt").read_text() == "new"
     assert not (tmp_path / "wiki" / "later.txt").exists()
     assert not (tmp_path.parent / "escape.txt").exists()
+
+
+def test_upload_can_be_limited_to_named_folders(tmp_path):
+    for name in ("wanted/a.txt", "other/b.txt"):
+        (tmp_path / name).parent.mkdir()
+        (tmp_path / name).write_text("x")
+
+    (tmp_path / "wanted").with_suffix(".txt").write_text("loose")
+
+    bucket = FakeBucket({})
+
+    assert r2.upload_tree(
+        bucket, tmp_path, "uploads/", folders=["wanted"]
+    ) == (1, 0)
+
+    assert list(bucket.objects) == ["uploads/wanted/a.txt"]

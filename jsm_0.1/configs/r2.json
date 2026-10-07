@@ -1,0 +1,10 @@
+{
+  "schema_version": "1.0.0",
+
+  "upload_sources": [
+    "berhot",
+    "saudi-dialect-conversations",
+    "voho-saudi-dialogues",
+    "wikipedia-ar"
+  ]
+}
