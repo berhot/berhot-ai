@@ -179,6 +179,10 @@ def train(
         "early_stopping_patience"
     )
 
+    log_every_steps = training_config.get(
+        "log_every_steps"
+    )
+
     epochs_without_improvement = 0
 
     token_stream = load_token_stream(
@@ -270,6 +274,21 @@ def train(
 
             # Number of next-token targets processed.
             tokens_seen += y.numel()
+
+            # A long epoch is otherwise silent until it ends.
+            if (
+                log_every_steps
+                and steps_this_epoch % log_every_steps == 0
+            ):
+                print(
+                    f"Epoch {epoch:03d} "
+                    f"| step {steps_this_epoch:,}"
+                    f"/{steps_per_epoch:,} "
+                    f"| loss="
+                    f"{total_loss / steps_this_epoch:.4f} "
+                    f"| minutes="
+                    f"{(time.perf_counter() - started_at) / 60:.1f}"
+                )
 
         if steps_this_epoch == 0:
             raise ValueError(

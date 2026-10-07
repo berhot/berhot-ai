@@ -20,6 +20,12 @@
       "authority": "provenance_policy"
     },
 
+    "voho-saudi-dialogues": {
+      "training_use": "allowed",
+      "basis": "Hugging Face dataset VohoAI/voho-saudi-dialogues, published under Apache-2.0.",
+      "authority": "provenance_policy"
+    },
+
     "aramco": {
       "training_use": "review_required",
       "basis": "Source requires explicit rights review.",

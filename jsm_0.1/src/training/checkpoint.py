@@ -72,9 +72,13 @@ def save_checkpoint(
     # Best checkpoint
     # --------------------------------------------------
 
+    # Saved without the optimizer state: this copy is for
+    # serving and sharing, never for resuming, and leaving
+    # the optimizer out makes it about a third of the size.
+
     if is_best:
-        copy_checkpoint(
-            path,
+        save_weights_only(
+            checkpoint,
             best_checkpoint_path(path),
         )
 
@@ -104,6 +108,28 @@ def save_checkpoint(
 def best_checkpoint_path(path: Path) -> Path:
     return path.with_name(
         "best_" + path.name
+    )
+
+
+def save_weights_only(
+    checkpoint: dict,
+    destination: Path,
+) -> None:
+    temporary_path = destination.with_suffix(
+        destination.suffix + ".tmp"
+    )
+
+    torch.save(
+        {
+            key: value
+            for key, value in checkpoint.items()
+            if key != "optimizer_state_dict"
+        },
+        temporary_path,
+    )
+
+    temporary_path.replace(
+        destination
     )
 
 
