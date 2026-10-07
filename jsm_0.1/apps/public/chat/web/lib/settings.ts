@@ -1,7 +1,7 @@
 // Generation settings are kept as the raw text the user typed and only
 // turned into numbers when a request is sent.
 
-export const TEMPERATURE = { min: 0, max: 2, step: 0.1, fallback: 0 };
+export const TEMPERATURE = { min: 0, max: 2, step: 0.1, fallback: 0.8 };
 export const MAX_NEW_TOKENS = { min: 1, max: 512, step: 1, fallback: 80 };
 
 export type SettingsDraft = { temperature: string; maxNewTokens: string };

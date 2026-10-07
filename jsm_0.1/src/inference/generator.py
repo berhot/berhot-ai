@@ -85,6 +85,35 @@ def apply_utf8_constraint(
     return constrained
 
 
+def apply_repetition_penalty(
+    logits: torch.Tensor,
+    token_ids: list[int],
+    penalty: float,
+) -> torch.Tensor:
+    if penalty == 1.0 or not token_ids:
+        return logits
+
+    penalized = logits.clone()
+
+    seen = torch.tensor(
+        sorted(set(token_ids)),
+        dtype=torch.long,
+        device=logits.device,
+    )
+
+    values = penalized[seen]
+
+    # Dividing a positive logit and multiplying a
+    # negative one both make the token less likely.
+    penalized[seen] = torch.where(
+        values > 0,
+        values / penalty,
+        values * penalty,
+    )
+
+    return penalized
+
+
 @torch.no_grad()
 def generate(
     model: TinyLLM,
@@ -92,7 +121,14 @@ def generate(
     prompt: str,
     max_new_tokens: int = 50,
     temperature: float = 1.0,
+    repetition_penalty: float = 1.3,
 ) -> str:
+
+    if repetition_penalty < 1.0:
+        raise ValueError(
+            "repetition_penalty must be "
+            "at least 1.0"
+        )
 
     model.eval()
 
@@ -135,6 +171,16 @@ def generate(
                 logits=next_token_logits,
                 tokenizer=tokenizer,
                 current_bytes=current_bytes,
+            )
+        )
+
+        # Applied to the tokens the model can currently
+        # see, so a loop in the prompt is not continued.
+        next_token_logits = (
+            apply_repetition_penalty(
+                logits=next_token_logits,
+                token_ids=context,
+                penalty=repetition_penalty,
             )
         )
 
