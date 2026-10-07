@@ -1,0 +1,9 @@
+{
+  "backend": "jsm_http",
+  "base_url": "http://127.0.0.1:8000",
+  "model": "tiny_model.pt",
+  "max_new_tokens": 100,
+  "temperature": 0.0,
+  "timeout_seconds": 60.0,
+  "allow_remote": false
+}
