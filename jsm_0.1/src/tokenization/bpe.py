@@ -13,6 +13,9 @@ PAD_ID = 258
 
 FIRST_MERGE_ID = 259
 
+# Space, tab, newline, carriage return.
+WHITESPACE_BYTES = frozenset({32, 9, 10, 13})
+
 
 @dataclass(frozen=True)
 class BPEModel:
@@ -25,6 +28,7 @@ class BPEModel:
 
 def count_pairs(
     sequences: list[list[int]],
+    blocked_right: set[int] | frozenset[int] = frozenset(),
 ) -> Counter[Pair]:
     counts: Counter[Pair] = Counter()
 
@@ -33,6 +37,9 @@ def count_pairs(
             tokens,
             tokens[1:],
         ):
+            if right in blocked_right:
+                continue
+
             counts[(left, right)] += 1
 
     return counts
@@ -88,8 +95,17 @@ def train_bpe(
     merges: list[Pair] = []
     next_token_id = FIRST_MERGE_ID
 
+    # Whitespace may only start a token, never follow
+    # other bytes inside one. Otherwise "time " becomes
+    # one token and a prompt ending in "time" is encoded
+    # differently from the same word in training text.
+    whitespace_led = set(WHITESPACE_BYTES)
+
     while next_token_id < target_vocab_size:
-        pair_counts = count_pairs(sequences)
+        pair_counts = count_pairs(
+            sequences,
+            blocked_right=whitespace_led,
+        )
 
         if not pair_counts:
             break
@@ -112,6 +128,9 @@ def train_bpe(
         ]
 
         merges.append(best_pair)
+
+        if best_pair[0] in whitespace_led:
+            whitespace_led.add(next_token_id)
 
         print(
             f"merge {next_token_id}: "

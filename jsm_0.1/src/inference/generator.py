@@ -100,8 +100,11 @@ def generate(
         model.parameters()
     ).device
 
+    # Whitespace belongs to the start of the next token,
+    # so a trailing space would be encoded as a token the
+    # model never saw at the end of a word.
     token_ids = tokenizer.encode(
-        prompt,
+        prompt.rstrip(),
         add_bos=True,
         add_eos=False,
     )
