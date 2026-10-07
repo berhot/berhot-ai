@@ -94,7 +94,7 @@ def process_task(
             before.st_size
             != after.st_size
             or before.st_mtime_ns
-            != after.mtime_ns
+            != after.st_mtime_ns
         ):
             raise ValueError(
                 "Clean text changed "

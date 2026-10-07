@@ -3,3 +3,5 @@ numpy
 fastapi
 uvicorn
 pypdf
+scikit-learn
+joblib
