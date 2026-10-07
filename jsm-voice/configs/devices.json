@@ -1,0 +1,7 @@
+{
+  "input_device": null,
+  "output_device": null,
+  "sample_rate_hz": 16000,
+  "recording_seconds": 8.0,
+  "max_turns": 20
+}
