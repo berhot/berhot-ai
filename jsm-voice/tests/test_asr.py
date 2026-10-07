@@ -97,3 +97,22 @@ def test_model_loaded_once_and_generator_consumed(corpus, monkeypatch: pytest.Mo
 def test_invalid_asr_configuration(changes) -> None:
     with pytest.raises(ValueError):
         ASRConfig(**changes)
+
+
+def test_cuda_initialization_falls_back_to_cpu(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from src.asr.backends import faster_whisper as module
+
+    (tmp_path / "model.bin").write_bytes(b"test-only")
+    calls = []
+
+    def load(*args, **kwargs):
+        calls.append(kwargs)
+        if kwargs["device"] == "cuda":
+            raise RuntimeError("GPU unavailable")
+        return object()
+
+    monkeypatch.setattr(module, "WhisperModel", load)
+    backend = module.FasterWhisperBackend(ASRConfig(model_directory=tmp_path, device="cuda"))
+    assert backend.device == "cpu"
+    assert [call["device"] for call in calls] == ["cuda", "cpu"]
+    assert calls[-1]["compute_type"] == "int8"
