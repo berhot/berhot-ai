@@ -1,12 +1,11 @@
-from src.corpus_factory.arabic_variety_classification.classifier import (
-    VarietyEvidence,
-    classify_evidence,
-    combine_evidence,
-    inspect_text,
+from src.corpus_factory.arabic_variety_classification.modeling.predictor import (
+    InferenceBundle,
+    predict_hierarchy,
 )
 from src.corpus_factory.arabic_variety_classification.result import (
+    ArabRegion,
     ArabicRegister,
-    SaudiVariety,
+    SaudiRegion,
     VarietyResult,
     VarietyStatus,
     VarietyTask,
@@ -18,17 +17,25 @@ from src.corpus_factory.intake.hashing import (
 
 def process_task(
     task: VarietyTask,
+    bundle: InferenceBundle,
 ) -> VarietyResult:
     try:
-        if task.source_path.is_symlink():
+        if (
+            task.source_path
+            .is_symlink()
+        ):
             raise ValueError(
                 "Arabic Variety source "
                 "cannot be a symlink"
             )
 
-        if not task.source_path.is_file():
+        if not (
+            task.source_path
+            .is_file()
+        ):
             raise ValueError(
-                "Arabic Variety source missing"
+                "Arabic Variety source "
+                "missing"
             )
 
         before = (
@@ -38,39 +45,45 @@ def process_task(
 
         if (
             before.st_size
-            != task.clean_text_size_bytes
+            != task
+            .clean_text_size_bytes
         ):
             raise ValueError(
-                "Clean text size mismatch"
+                "Clean text size "
+                "mismatch"
             )
 
         if (
             sha256_file(
                 task.source_path
             )
-            != task.clean_text_sha256
+            != task
+            .clean_text_sha256
         ):
             raise ValueError(
-                "Clean text SHA-256 mismatch"
+                "Clean text SHA-256 "
+                "mismatch"
             )
 
-        evidence = VarietyEvidence()
+        text = (
+            task.source_path
+            .read_text(
+                encoding="utf-8"
+            )
+        )
 
-        with task.source_path.open(
-            "r",
-            encoding="utf-8",
-            errors="strict",
-            newline="",
-        ) as source:
-            for line in source:
-                evidence = (
-                    combine_evidence(
-                        evidence,
-                        inspect_text(
-                            line
-                        ),
-                    )
-                )
+        if not text.strip():
+            raise ValueError(
+                "Cannot classify "
+                "empty clean text"
+            )
+
+        prediction = (
+            predict_hierarchy(
+                text=text,
+                bundle=bundle,
+            )
+        )
 
         after = (
             task.source_path
@@ -81,162 +94,280 @@ def process_task(
             before.st_size
             != after.st_size
             or before.st_mtime_ns
-            != after.st_mtime_ns
+            != after.mtime_ns
         ):
             raise ValueError(
-                "Clean text changed during "
-                "Arabic Variety classification"
+                "Clean text changed "
+                "during classification"
             )
 
-        classification = (
-            classify_evidence(
-                evidence
+        warnings = []
+
+        if (
+            prediction.stopped_at
+            is not None
+        ):
+            warnings.append(
+                "low_confidence_"
+                + prediction.stopped_at
             )
+
+        register = (
+            ArabicRegister(
+                prediction.register
+            )
+            if prediction.register
+            is not None
+            else
+            ArabicRegister
+            .UNDETERMINED
+        )
+
+        if (
+            prediction.arab_region
+            is None
+        ):
+            arab_region = (
+                ArabRegion
+                .NOT_APPLICABLE
+                if (
+                    prediction.accepted
+                    and register
+                    in (
+                        ArabicRegister.MSA,
+                        ArabicRegister.CLASSICAL,
+                    )
+                )
+                else
+                ArabRegion.UNDETERMINED
+            )
+
+        else:
+            arab_region = (
+                ArabRegion(
+                    prediction
+                    .arab_region
+                )
+            )
+
+        if (
+            prediction.saudi_region
+            is None
+        ):
+            if (
+                prediction.accepted
+                and (
+                    arab_region
+                    is not
+                    ArabRegion.SAUDI
+                )
+            ):
+                saudi_region = (
+                    SaudiRegion
+                    .NOT_APPLICABLE
+                )
+
+            else:
+                saudi_region = (
+                    SaudiRegion
+                    .UNDETERMINED
+                )
+
+        else:
+            saudi_region = (
+                SaudiRegion(
+                    prediction
+                    .saudi_region
+                )
+            )
+
+        status = (
+            VarietyStatus.CLASSIFIED
+            if prediction.accepted
+            else
+            VarietyStatus
+            .REVIEW_REQUIRED
         )
 
         return VarietyResult(
             language_classification_id=(
-                task.language_classification_id
+                task
+                .language_classification_id
             ),
+
             cleaning_id=(
                 task.cleaning_id
             ),
+
             extraction_id=(
                 task.extraction_id
             ),
+
             raw_exact_id=(
                 task.raw_exact_id
             ),
+
             ingestion_id=(
                 task.ingestion_id
             ),
+
             batch_id=(
                 task.batch_id
             ),
+
             document_id=(
                 task.document_id
             ),
+
             clean_document_id=(
                 task.clean_document_id
             ),
+
             artifact_id=(
                 task.artifact_id
             ),
+
             original_filename=(
                 task.original_filename
             ),
-            status=(
-                classification.status
-            ),
-            register=(
-                classification.register
-            ),
-            saudi_variety=(
-                classification.saudi_variety
-            ),
+
             clean_text_sha256=(
                 task.clean_text_sha256
             ),
+
             clean_text_size_bytes=(
-                task.clean_text_size_bytes
+                task
+                .clean_text_size_bytes
             ),
-            arabic_words=(
-                classification.arabic_words
+
+            status=status,
+
+            register=(
+                register
             ),
-            classical_score=(
-                classification.classical_score
+
+            arab_region=(
+                arab_region
             ),
-            saudi_score=(
-                classification.saudi_score
+
+            saudi_region=(
+                saudi_region
             ),
-            najdi_score=(
-                classification.najdi_score
+
+            register_decision=(
+                prediction
+                .register_decision
             ),
-            hijazi_score=(
-                classification.hijazi_score
+
+            arab_region_decision=(
+                prediction
+                .arab_region_decision
             ),
-            janoubi_score=(
-                classification.janoubi_score
+
+            saudi_region_decision=(
+                prediction
+                .saudi_region_decision
             ),
-            shamali_score=(
-                classification.shamali_score
+
+            model_bundle_sha256=(
+                bundle
+                .bundle_sha256
             ),
-            sharqawi_score=(
-                classification.sharqawi_score
+
+            warnings=tuple(
+                warnings
             ),
-            tihami_score=(
-                classification.tihami_score
-            ),
-            confidence=(
-                classification.confidence
-            ),
-            evidence=(
-                classification.evidence
-            ),
-            warnings=(
-                classification.warnings
-            ),
+
             error=None,
         )
 
     except Exception as error:
         return VarietyResult(
             language_classification_id=(
-                task.language_classification_id
+                task
+                .language_classification_id
             ),
+
             cleaning_id=(
                 task.cleaning_id
             ),
+
             extraction_id=(
                 task.extraction_id
             ),
+
             raw_exact_id=(
                 task.raw_exact_id
             ),
+
             ingestion_id=(
                 task.ingestion_id
             ),
+
             batch_id=(
                 task.batch_id
             ),
+
             document_id=(
                 task.document_id
             ),
+
             clean_document_id=(
                 task.clean_document_id
             ),
+
             artifact_id=(
                 task.artifact_id
             ),
+
             original_filename=(
                 task.original_filename
             ),
-            status=(
-                VarietyStatus.FAILED
-            ),
-            register=(
-                ArabicRegister.UNDETERMINED
-            ),
-            saudi_variety=(
-                SaudiVariety.UNSPECIFIED
-            ),
+
             clean_text_sha256=(
                 task.clean_text_sha256
             ),
+
             clean_text_size_bytes=(
-                task.clean_text_size_bytes
+                task
+                .clean_text_size_bytes
             ),
-            arabic_words=0,
-            classical_score=0,
-            saudi_score=0,
-            najdi_score=0,
-            hijazi_score=0,
-            janoubi_score=0,
-            shamali_score=0,
-            sharqawi_score=0,
-            tihami_score=0,
-            confidence=0.0,
-            evidence=(),
+
+            status=(
+                VarietyStatus.FAILED
+            ),
+
+            register=(
+                ArabicRegister
+                .UNDETERMINED
+            ),
+
+            arab_region=(
+                ArabRegion
+                .UNDETERMINED
+            ),
+
+            saudi_region=(
+                SaudiRegion
+                .UNDETERMINED
+            ),
+
+            register_decision=None,
+            arab_region_decision=None,
+            saudi_region_decision=None,
+
+            model_bundle_sha256=(
+                bundle
+                .bundle_sha256
+            ),
+
             warnings=(),
-            error=str(error)[:1000],
+
+            error=(
+                str(
+                    error
+                )[
+                    :1000
+                ]
+            ),
         )

@@ -1,6 +1,8 @@
 import json
 
-from collections.abc import Iterator
+from collections.abc import (
+    Iterator,
+)
 from pathlib import Path
 
 from src.corpus_factory.arabic_variety_classification.result import (
@@ -21,19 +23,13 @@ def read_checksum(
             f"{checksum_path}"
         )
 
-    try:
-        text = checksum_path.read_text(
+    text = (
+        checksum_path
+        .read_text(
             encoding="ascii"
-        ).strip()
-
-    except (
-        OSError,
-        UnicodeError,
-    ) as error:
-        raise ValueError(
-            f"Cannot read checksum: "
-            f"{checksum_path}"
-        ) from error
+        )
+        .strip()
+    )
 
     if not text:
         raise ValueError(
@@ -41,13 +37,15 @@ def read_checksum(
             f"{checksum_path}"
         )
 
-    digest = text.split()[0]
+    digest = (
+        text.split()[0]
+    )
 
     if not is_valid_sha256(
         digest
     ):
         raise ValueError(
-            f"Invalid SHA-256 checksum: "
+            f"Invalid SHA-256: "
             f"{checksum_path}"
         )
 
@@ -56,29 +54,37 @@ def read_checksum(
 
 def load_language_manifest(
     language_dir: Path,
-) -> tuple[dict, str]:
+) -> tuple[
+    dict,
+    str,
+]:
     manifest_path = (
         language_dir
         / "manifest.json"
     )
 
-    checksum_path = (
+    sidecar_path = (
         language_dir
         / "manifest.json.sha256"
     )
 
     if not manifest_path.is_file():
         raise ValueError(
-            f"Language manifest missing: "
+            f"Language manifest "
+            f"missing: "
             f"{manifest_path}"
         )
 
-    expected_hash = read_checksum(
-        checksum_path
+    expected_hash = (
+        read_checksum(
+            sidecar_path
+        )
     )
 
-    actual_hash = sha256_file(
-        manifest_path
+    actual_hash = (
+        sha256_file(
+            manifest_path
+        )
     )
 
     if (
@@ -90,30 +96,19 @@ def load_language_manifest(
             "checksum mismatch"
         )
 
-    try:
-        manifest = json.loads(
-            manifest_path.read_text(
-                encoding="utf-8"
-            )
+    manifest = json.loads(
+        manifest_path.read_text(
+            encoding="utf-8"
         )
-
-    except (
-        OSError,
-        UnicodeError,
-        json.JSONDecodeError,
-    ) as error:
-        raise ValueError(
-            f"Invalid Language manifest: "
-            f"{manifest_path}"
-        ) from error
+    )
 
     if not isinstance(
         manifest,
         dict,
     ):
         raise ValueError(
-            "Language manifest must "
-            "contain a JSON object"
+            "Language manifest "
+            "must be an object"
         )
 
     if (
@@ -135,7 +130,7 @@ def load_language_manifest(
     ):
         raise ValueError(
             "Invalid Language "
-            "manifest record type"
+            "manifest type"
         )
 
     classification_id = (
@@ -152,8 +147,8 @@ def load_language_manifest(
         or not classification_id
     ):
         raise ValueError(
-            "Language manifest has "
-            "no valid classification_id"
+            "Invalid Language "
+            "classification_id"
         )
 
     if (
@@ -161,8 +156,8 @@ def load_language_manifest(
         != language_dir.name
     ):
         raise ValueError(
-            "Language classification ID "
-            "does not match directory"
+            "Language ID does not "
+            "match directory"
         )
 
     if (
@@ -172,12 +167,15 @@ def load_language_manifest(
         != "arabic_variety_classification"
     ):
         raise ValueError(
-            "Language run is not routed "
-            "to Arabic Variety Classification"
+            "Language run is not "
+            "routed to Arabic "
+            "Variety Classification"
         )
 
-    source = manifest.get(
-        "source"
+    source = (
+        manifest.get(
+            "source"
+        )
     )
 
     if not isinstance(
@@ -185,8 +183,8 @@ def load_language_manifest(
         dict,
     ):
         raise ValueError(
-            "Language manifest has "
-            "no source object"
+            "Language source "
+            "metadata missing"
         )
 
     cleaning_directory = (
@@ -195,7 +193,7 @@ def load_language_manifest(
         )
     )
 
-    cleaning_hash = (
+    cleaning_manifest_hash = (
         source.get(
             "cleaning_manifest_sha256"
         )
@@ -209,22 +207,22 @@ def load_language_manifest(
         or not cleaning_directory
     ):
         raise ValueError(
-            "Language manifest has "
-            "no cleaning directory"
+            "Cleaning directory "
+            "missing"
         )
 
     if (
         not isinstance(
-            cleaning_hash,
+            cleaning_manifest_hash,
             str,
         )
         or not is_valid_sha256(
-            cleaning_hash
+            cleaning_manifest_hash
         )
     ):
         raise ValueError(
-            "Language manifest has "
-            "invalid cleaning SHA-256"
+            "Invalid Cleaning "
+            "manifest SHA-256"
         )
 
     cleaning_manifest_path = (
@@ -234,38 +232,26 @@ def load_language_manifest(
         / "manifest.json"
     )
 
-    if not cleaning_manifest_path.is_file():
-        raise ValueError(
-            "Referenced Cleaning "
-            "manifest is missing"
-        )
-
     if (
         sha256_file(
             cleaning_manifest_path
         )
-        != cleaning_hash
+        != cleaning_manifest_hash
     ):
         raise ValueError(
-            "Cleaning manifest changed "
-            "after Language Classification"
+            "Cleaning manifest "
+            "changed after Language "
+            "Classification"
         )
 
-    artifacts = manifest.get(
-        "artifacts"
-    )
-
-    if not isinstance(
-        artifacts,
-        dict,
-    ):
-        raise ValueError(
-            "Language manifest has "
-            "no artifacts object"
+    annotations = (
+        manifest.get(
+            "artifacts",
+            {}
         )
-
-    annotations = artifacts.get(
-        "annotations"
+        .get(
+            "annotations"
+        )
     )
 
     if not isinstance(
@@ -273,21 +259,9 @@ def load_language_manifest(
         dict,
     ):
         raise ValueError(
-            "Language manifest has "
-            "no annotations artifact"
+            "Language annotations "
+            "metadata missing"
         )
-
-    annotations_hash = (
-        annotations.get(
-            "sha256"
-        )
-    )
-
-    expected_records = (
-        annotations.get(
-            "records"
-        )
-    )
 
     if (
         annotations.get(
@@ -300,28 +274,42 @@ def load_language_manifest(
             "annotations path"
         )
 
+    expected_annotations_hash = (
+        annotations.get(
+            "sha256"
+        )
+    )
+
+    expected_records = (
+        annotations.get(
+            "records"
+        )
+    )
+
     if (
         not isinstance(
-            annotations_hash,
+            expected_annotations_hash,
             str,
         )
         or not is_valid_sha256(
-            annotations_hash
+            expected_annotations_hash
         )
     ):
         raise ValueError(
-            "Language annotations have "
-            "invalid SHA-256"
+            "Invalid annotations "
+            "SHA-256"
         )
 
     if (
-        type(expected_records)
+        type(
+            expected_records
+        )
         is not int
         or expected_records < 0
     ):
         raise ValueError(
-            "Language annotations have "
-            "invalid record count"
+            "Invalid annotations "
+            "record count"
         )
 
     annotations_path = (
@@ -329,36 +317,27 @@ def load_language_manifest(
         / "annotations.jsonl"
     )
 
-    if not annotations_path.is_file():
-        raise ValueError(
-            "Language annotations missing"
-        )
-
     if (
         sha256_file(
             annotations_path
         )
-        != annotations_hash
+        != expected_annotations_hash
     ):
         raise ValueError(
             "Language annotations "
             "checksum mismatch"
         )
 
-    sidecar_path = (
-        language_dir
-        / "annotations.jsonl.sha256"
-    )
-
     if (
         read_checksum(
-            sidecar_path
+            language_dir
+            / "annotations.jsonl.sha256"
         )
-        != annotations_hash
+        != expected_annotations_hash
     ):
         raise ValueError(
-            "Language annotations sidecar "
-            "checksum mismatch"
+            "Language annotations "
+            "sidecar mismatch"
         )
 
     return (
@@ -371,7 +350,9 @@ def iter_tasks(
     *,
     language_dir: Path,
     language_manifest: dict,
-) -> Iterator[VarietyTask]:
+) -> Iterator[
+    VarietyTask
+]:
     classification_id = (
         language_manifest[
             "classification_id"
@@ -432,38 +413,40 @@ def iter_tasks(
     )
 
     observed_records = 0
-    seen_clean_ids = set()
+
+    seen_clean_documents = (
+        set()
+    )
 
     with annotations_path.open(
         "r",
         encoding="utf-8",
         newline="",
     ) as stream:
-        for line_number, line in enumerate(
+        for (
+            line_number,
+            line,
+        ) in enumerate(
             stream,
             start=1,
         ):
             observed_records += 1
 
             try:
-                record = json.loads(
-                    line
+                record = (
+                    json.loads(
+                        line
+                    )
                 )
 
-            except json.JSONDecodeError as error:
+            except (
+                json.JSONDecodeError
+            ) as error:
                 raise ValueError(
-                    f"Invalid Language JSONL "
-                    f"at line {line_number}"
+                    f"Invalid Language "
+                    f"JSONL line "
+                    f"{line_number}"
                 ) from error
-
-            if not isinstance(
-                record,
-                dict,
-            ):
-                raise ValueError(
-                    "Language annotation must "
-                    "be a JSON object"
-                )
 
             if (
                 record.get(
@@ -473,18 +456,7 @@ def iter_tasks(
             ):
                 raise ValueError(
                     "Invalid Language "
-                    "annotation type"
-                )
-
-            if (
-                record.get(
-                    "cleaning_id"
-                )
-                != cleaning_id
-            ):
-                raise ValueError(
-                    "Language/Cleaning ID "
-                    "mismatch"
+                    "record type"
                 )
 
             if (
@@ -492,12 +464,22 @@ def iter_tasks(
                     "status"
                 )
                 != "classified"
-                or record.get(
+            ):
+                continue
+
+            if (
+                record.get(
                     "language"
                 )
                 != "arabic"
             ):
                 continue
+
+            document_id = (
+                record.get(
+                    "document_id"
+                )
+            )
 
             clean_document_id = (
                 record.get(
@@ -505,12 +487,10 @@ def iter_tasks(
                 )
             )
 
-            document_id = record.get(
-                "document_id"
-            )
-
-            artifact_id = record.get(
-                "artifact_id"
+            artifact_id = (
+                record.get(
+                    "artifact_id"
+                )
             )
 
             original_filename = (
@@ -519,103 +499,88 @@ def iter_tasks(
                 )
             )
 
-            clean_text_sha256 = (
+            clean_hash = (
                 record.get(
                     "clean_text_sha256"
                 )
             )
 
-            clean_text_size_bytes = (
+            clean_size = (
                 record.get(
                     "clean_text_size_bytes"
                 )
             )
 
-            if (
-                not isinstance(
+            for (
+                field_name,
+                value,
+            ) in (
+                (
+                    "document_id",
+                    document_id,
+                ),
+                (
+                    "clean_document_id",
                     clean_document_id,
-                    str,
-                )
-                or not clean_document_id
+                ),
+                (
+                    "artifact_id",
+                    artifact_id,
+                ),
+                (
+                    "original_filename",
+                    original_filename,
+                ),
             ):
-                raise ValueError(
-                    "Arabic Language annotation "
-                    "has no clean_document_id"
-                )
+                if (
+                    not isinstance(
+                        value,
+                        str,
+                    )
+                    or not value
+                ):
+                    raise ValueError(
+                        f"Invalid "
+                        f"{field_name}"
+                    )
 
             if (
                 clean_document_id
-                in seen_clean_ids
+                in seen_clean_documents
             ):
                 raise ValueError(
-                    "Duplicate Arabic "
+                    "Duplicate "
                     "clean_document_id"
                 )
 
-            seen_clean_ids.add(
+            seen_clean_documents.add(
                 clean_document_id
             )
 
             if (
                 not isinstance(
-                    document_id,
-                    str,
-                )
-                or not document_id
-            ):
-                raise ValueError(
-                    "Arabic Language annotation "
-                    "has no document_id"
-                )
-
-            if (
-                not isinstance(
-                    artifact_id,
-                    str,
-                )
-                or not artifact_id
-            ):
-                raise ValueError(
-                    "Arabic Language annotation "
-                    "has no artifact_id"
-                )
-
-            if (
-                not isinstance(
-                    original_filename,
-                    str,
-                )
-                or not original_filename
-            ):
-                raise ValueError(
-                    "Arabic Language annotation "
-                    "has no original filename"
-                )
-
-            if (
-                not isinstance(
-                    clean_text_sha256,
+                    clean_hash,
                     str,
                 )
                 or not is_valid_sha256(
-                    clean_text_sha256
+                    clean_hash
                 )
             ):
                 raise ValueError(
-                    "Arabic Language annotation "
-                    "has invalid clean SHA-256"
+                    "Invalid clean text "
+                    "SHA-256"
                 )
 
             if (
                 type(
-                    clean_text_size_bytes
+                    clean_size
                 )
                 is not int
-                or clean_text_size_bytes < 0
+                or clean_size < 0
             ):
                 raise ValueError(
-                    "Arabic Language annotation "
-                    "has invalid clean text size"
+                    "Invalid clean text "
+                    "size"
                 )
 
             source_path = (
@@ -628,41 +593,53 @@ def iter_tasks(
                 language_classification_id=(
                     classification_id
                 ),
+
                 cleaning_id=(
                     cleaning_id
                 ),
+
                 extraction_id=(
                     extraction_id
                 ),
+
                 raw_exact_id=(
                     raw_exact_id
                 ),
+
                 ingestion_id=(
                     ingestion_id
                 ),
+
                 batch_id=(
                     batch_id
                 ),
+
                 document_id=(
                     document_id
                 ),
+
                 clean_document_id=(
                     clean_document_id
                 ),
+
                 artifact_id=(
                     artifact_id
                 ),
+
                 original_filename=(
                     original_filename
                 ),
+
                 source_path=(
                     source_path
                 ),
+
                 clean_text_sha256=(
-                    clean_text_sha256
+                    clean_hash
                 ),
+
                 clean_text_size_bytes=(
-                    clean_text_size_bytes
+                    clean_size
                 ),
             )
 
@@ -671,6 +648,6 @@ def iter_tasks(
         != expected_records
     ):
         raise ValueError(
-            "Language annotation count "
-            "does not match manifest"
+            "Language annotations "
+            "record count mismatch"
         )

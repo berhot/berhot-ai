@@ -4,7 +4,9 @@ import os
 import shutil
 import tempfile
 
-from dataclasses import asdict
+from dataclasses import (
+    asdict,
+)
 from datetime import (
     datetime,
     timezone,
@@ -12,9 +14,6 @@ from datetime import (
 from pathlib import Path
 from uuid import uuid4
 
-from src.corpus_factory.arabic_variety_classification.classifier import (
-    CLASSIFIER_VERSION,
-)
 from src.corpus_factory.arabic_variety_classification.dispatcher import (
     dispatch,
 )
@@ -22,6 +21,10 @@ from src.corpus_factory.arabic_variety_classification.loader import (
     iter_tasks,
     load_language_manifest,
     read_checksum,
+)
+from src.corpus_factory.arabic_variety_classification.modeling.predictor import (
+    InferenceBundle,
+    build_inference_bundle,
 )
 from src.corpus_factory.arabic_variety_classification.result import (
     VarietyStatus,
@@ -32,7 +35,9 @@ from src.corpus_factory.intake.hashing import (
 )
 
 
-MANIFEST_SCHEMA_VERSION = "1.0.0"
+MANIFEST_SCHEMA_VERSION = (
+    "2.0.0"
+)
 
 MANIFEST_RECORD_TYPE = (
     "arabic_variety_classification_manifest"
@@ -53,6 +58,7 @@ def utc_now() -> str:
 
 
 def write_checksum(
+    *,
     path: Path,
     digest: str,
 ) -> None:
@@ -67,23 +73,27 @@ def write_checksum(
     with path.open(
         "x",
         encoding="ascii",
-    ) as file:
-        file.write(
+    ) as stream:
+        stream.write(
             digest
             + "\n"
         )
 
-        file.flush()
+        stream.flush()
 
         os.fsync(
-            file.fileno()
+            stream.fileno()
         )
 
 
-def completed_language_runs(
+def completed_states(
     output_dir: Path,
 ) -> set[
-    tuple[str, str]
+    tuple[
+        str,
+        str,
+        str,
+    ]
 ]:
     completed = set()
 
@@ -101,21 +111,21 @@ def completed_language_runs(
             / "manifest.json"
         )
 
-        checksum_path = (
+        sidecar_path = (
             run_dir
             / "manifest.json.sha256"
         )
 
         if (
             not manifest_path.is_file()
-            or not checksum_path.is_file()
+            or not sidecar_path.is_file()
         ):
             continue
 
         try:
             expected_hash = (
                 read_checksum(
-                    checksum_path
+                    sidecar_path
                 )
             )
 
@@ -138,41 +148,61 @@ def completed_language_runs(
             )
 
             if (
-                not isinstance(
-                    manifest,
-                    dict,
-                )
-                or manifest.get(
+                manifest.get(
                     "schema_version"
                 )
                 != MANIFEST_SCHEMA_VERSION
-                or manifest.get(
+            ):
+                continue
+
+            if (
+                manifest.get(
                     "record_type"
                 )
                 != MANIFEST_RECORD_TYPE
-                or manifest.get(
-                    "variety_classification_id"
+            ):
+                continue
+
+            source = (
+                manifest.get(
+                    "source"
                 )
-                != run_dir.name
+            )
+
+            models = (
+                manifest.get(
+                    "models"
+                )
+            )
+
+            if (
+                not isinstance(
+                    source,
+                    dict,
+                )
+                or not isinstance(
+                    models,
+                    dict,
+                )
             ):
                 continue
 
-            source = manifest.get(
-                "source"
+            language_id = (
+                source.get(
+                    "language_classification_id"
+                )
             )
 
-            if not isinstance(
-                source,
-                dict,
-            ):
-                continue
-
-            language_id = source.get(
-                "language_classification_id"
+            language_hash = (
+                source.get(
+                    "language_manifest_sha256"
+                )
             )
 
-            language_hash = source.get(
-                "language_manifest_sha256"
+            bundle_hash = (
+                models.get(
+                    "bundle_sha256"
+                )
             )
 
             if (
@@ -187,11 +217,19 @@ def completed_language_runs(
                 and is_valid_sha256(
                     language_hash
                 )
+                and isinstance(
+                    bundle_hash,
+                    str,
+                )
+                and is_valid_sha256(
+                    bundle_hash
+                )
             ):
                 completed.add(
                     (
                         language_id,
                         language_hash,
+                        bundle_hash,
                     )
                 )
 
@@ -206,15 +244,59 @@ def completed_language_runs(
     return completed
 
 
+def model_manifest_record(
+    bundle: InferenceBundle,
+) -> dict:
+    def artifact(
+        value,
+    ) -> dict:
+        return {
+            "version": (
+                value.model_version
+            ),
+
+            "model_sha256": (
+                value.model_sha256
+            ),
+
+            "policy_sha256": (
+                value.policy_sha256
+            ),
+
+            "metadata_sha256": (
+                value.metadata_sha256
+            ),
+        }
+
+    return {
+        "bundle_sha256": (
+            bundle.bundle_sha256
+        ),
+
+        "register": artifact(
+            bundle.register
+        ),
+
+        "arab_region": artifact(
+            bundle.arab_region
+        ),
+
+        "saudi_region": artifact(
+            bundle.saudi_region
+        ),
+    }
+
+
 def classify_language_run(
     *,
     language_dir: Path,
     language_manifest: dict,
     language_manifest_sha256: str,
+    bundle: InferenceBundle,
     output_dir: Path,
     workers: int,
 ) -> Path:
-    variety_classification_id = (
+    classification_id = (
         "arabic_variety_"
         f"{datetime.now(timezone.utc):%Y%m%dT%H%M%S%fZ}_"
         f"{uuid4().hex}"
@@ -222,16 +304,8 @@ def classify_language_run(
 
     destination = (
         output_dir
-        / variety_classification_id
+        / classification_id
     )
-
-    if (
-        destination.exists()
-        or destination.is_symlink()
-    ):
-        raise FileExistsError(
-            destination
-        )
 
     staging = Path(
         tempfile.mkdtemp(
@@ -252,24 +326,29 @@ def classify_language_run(
             "review_required": 0,
             "failed": 0,
 
-            "standard_arabic": 0,
+            "msa": 0,
             "classical": 0,
-            "saudi_dialect": 0,
-            "undetermined": 0,
+            "dialect": 0,
+            "register_undetermined": 0,
+
+            "saudi": 0,
+            "non_saudi_dialect": 0,
+            "arab_region_undetermined": 0,
 
             "najdi": 0,
             "hijazi": 0,
-            "janoubi": 0,
-            "shamali": 0,
-            "sharqawi": 0,
+            "eastern": 0,
+            "southern": 0,
+            "northern": 0,
             "tihami": 0,
-            "saudi_unspecified": 0,
+            "saudi_region_undetermined": 0,
         }
 
         tasks = iter_tasks(
             language_dir=(
                 language_dir
             ),
+
             language_manifest=(
                 language_manifest
             ),
@@ -279,28 +358,25 @@ def classify_language_run(
             "x",
             encoding="utf-8",
             newline="",
-        ) as annotations:
+        ) as stream:
             for result in dispatch(
                 tasks,
+                bundle=bundle,
                 workers=workers,
                 max_pending=(
                     workers * 2
                 ),
             ):
-                record = asdict(
-                    result
+                record = (
+                    asdict(
+                        result
+                    )
                 )
 
                 record[
                     "record_type"
                 ] = (
                     "arabic_variety_classification"
-                )
-
-                record[
-                    "classifier_version"
-                ] = (
-                    CLASSIFIER_VERSION
                 )
 
                 record[
@@ -316,15 +392,19 @@ def classify_language_run(
                 )
 
                 record[
-                    "saudi_variety"
+                    "arab_region"
                 ] = (
-                    result.saudi_variety.value
+                    result
+                    .arab_region
+                    .value
                 )
 
                 record[
-                    "evidence"
-                ] = list(
-                    result.evidence
+                    "saudi_region"
+                ] = (
+                    result
+                    .saudi_region
+                    .value
                 )
 
                 record[
@@ -333,7 +413,7 @@ def classify_language_run(
                     result.warnings
                 )
 
-                annotations.write(
+                stream.write(
                     json.dumps(
                         record,
                         ensure_ascii=False,
@@ -352,7 +432,8 @@ def classify_language_run(
 
                 if (
                     result.status
-                    is VarietyStatus.CLASSIFIED
+                    is
+                    VarietyStatus.CLASSIFIED
                 ):
                     summary[
                         "classified"
@@ -360,7 +441,8 @@ def classify_language_run(
 
                 elif (
                     result.status
-                    is VarietyStatus.REVIEW_REQUIRED
+                    is
+                    VarietyStatus.REVIEW_REQUIRED
                 ):
                     summary[
                         "review_required"
@@ -371,33 +453,94 @@ def classify_language_run(
                         "failed"
                     ] += 1
 
-                summary[
-                    result.register.value
-                ] += 1
-
                 if (
-                    result.saudi_variety.value
-                    in summary
+                    result.register.value
+                    in (
+                        "msa",
+                        "classical",
+                        "dialect",
+                    )
                 ):
                     summary[
-                        result.saudi_variety.value
+                        result.register.value
+                    ] += 1
+
+                else:
+                    summary[
+                        "register_undetermined"
+                    ] += 1
+
+                if (
+                    result.arab_region.value
+                    == "saudi"
+                ):
+                    summary[
+                        "saudi"
+                    ] += 1
+
+                elif (
+                    result.register.value
+                    == "dialect"
+                    and result
+                    .arab_region
+                    .value
+                    not in (
+                        "undetermined",
+                        "not_applicable",
+                    )
+                ):
+                    summary[
+                        "non_saudi_dialect"
+                    ] += 1
+
+                elif (
+                    result.register.value
+                    == "dialect"
+                ):
+                    summary[
+                        "arab_region_undetermined"
+                    ] += 1
+
+                if (
+                    result.saudi_region.value
+                    in (
+                        "najdi",
+                        "hijazi",
+                        "eastern",
+                        "southern",
+                        "northern",
+                        "tihami",
+                    )
+                ):
+                    summary[
+                        result.saudi_region.value
+                    ] += 1
+
+                elif (
+                    result.arab_region.value
+                    == "saudi"
+                ):
+                    summary[
+                        "saudi_region_undetermined"
                     ] += 1
 
                 print(
-                    f"ARABIC VARIETY: "
+                    "ARABIC VARIETY: "
                     f"{result.original_filename}"
-                    f" -> "
+                    " -> "
                     f"{result.register.value}"
-                    f" / "
-                    f"{result.saudi_variety.value}"
-                    f" "
+                    " / "
+                    f"{result.arab_region.value}"
+                    " / "
+                    f"{result.saudi_region.value}"
+                    " "
                     f"({result.status.value})"
                 )
 
-            annotations.flush()
+            stream.flush()
 
             os.fsync(
-                annotations.fileno()
+                stream.fileno()
             )
 
         annotations_hash = (
@@ -406,33 +549,32 @@ def classify_language_run(
             )
         )
 
-        annotations_size = (
-            annotations_path
-            .stat()
-            .st_size
-        )
-
         write_checksum(
-            (
+            path=(
                 staging
                 / "annotations.jsonl.sha256"
             ),
-            annotations_hash,
+
+            digest=(
+                annotations_hash
+            ),
         )
 
         manifest = {
             "schema_version": (
                 MANIFEST_SCHEMA_VERSION
             ),
+
             "record_type": (
                 MANIFEST_RECORD_TYPE
             ),
+
             "variety_classification_id": (
-                variety_classification_id
+                classification_id
             ),
-            "created_at": utc_now(),
-            "classifier_version": (
-                CLASSIFIER_VERSION
+
+            "created_at": (
+                utc_now()
             ),
 
             "language_classification_id": (
@@ -483,30 +625,37 @@ def classify_language_run(
                 ),
 
                 "language_directory": str(
-                    language_dir.absolute()
+                    language_dir.resolve()
                 ),
             },
 
+            "models": (
+                model_manifest_record(
+                    bundle
+                )
+            ),
+
             "method": {
-                "name": (
-                    "deterministic_lexical_evidence_baseline"
+                "type": (
+                    "hierarchical_supervised_classification"
                 ),
 
-                "semantic_model_used": False,
+                "hierarchy": [
+                    "register",
+                    "arab_region",
+                    "saudi_region",
+                ],
 
-                "automatic_text_modification": False,
-
-                "msa_without_positive_evidence": (
-                    "review_required"
+                "lexical_rules_are_authority": (
+                    False
                 ),
 
-                "regional_classification_requires_multiple_markers": True,
+                "confidence_abstention": (
+                    True
+                ),
 
-                "limitations": (
-                    "Lexical markers are a conservative baseline. "
-                    "Production-grade MSA, Classical, Saudi dialect, "
-                    "and regional classification should later use "
-                    "evaluated Arabic classifiers and human-labelled data."
+                "text_modified": (
+                    False
                 ),
             },
 
@@ -527,7 +676,9 @@ def classify_language_run(
                     ),
 
                     "size_bytes": (
-                        annotations_size
+                        annotations_path
+                        .stat()
+                        .st_size
                     ),
                 },
             },
@@ -565,15 +716,15 @@ def classify_language_run(
 
         with manifest_path.open(
             "xb"
-        ) as output:
-            output.write(
+        ) as stream:
+            stream.write(
                 encoded
             )
 
-            output.flush()
+            stream.flush()
 
             os.fsync(
-                output.fileno()
+                stream.fileno()
             )
 
         manifest_hash = (
@@ -584,11 +735,14 @@ def classify_language_run(
         )
 
         write_checksum(
-            (
+            path=(
                 staging
                 / "manifest.json.sha256"
             ),
-            manifest_hash,
+
+            digest=(
+                manifest_hash
+            ),
         )
 
         os.rename(
@@ -617,6 +771,10 @@ def arabic_variety_classification(
     *,
     language_dir: Path,
     output_dir: Path,
+    model_root: Path,
+    register_version: str,
+    arab_region_version: str,
+    saudi_region_version: str,
     workers: int = 4,
 ) -> None:
     if workers <= 0:
@@ -624,11 +782,32 @@ def arabic_variety_classification(
             "workers must be positive"
         )
 
+    bundle = (
+        build_inference_bundle(
+            model_root=(
+                model_root
+            ),
+
+            register_version=(
+                register_version
+            ),
+
+            arab_region_version=(
+                arab_region_version
+            ),
+
+            saudi_region_version=(
+                saudi_region_version
+            ),
+        )
+    )
+
     if not language_dir.is_dir():
         print(
-            "No Language Classification "
-            "data found."
+            "No Language "
+            "Classification data."
         )
+
         return
 
     output_dir.mkdir(
@@ -637,7 +816,7 @@ def arabic_variety_classification(
     )
 
     completed = (
-        completed_language_runs(
+        completed_states(
             output_dir
         )
     )
@@ -652,21 +831,18 @@ def arabic_variety_classification(
         )
     )
 
-    if not language_runs:
-        print(
-            "No Language Classification "
-            "data found."
-        )
-        return
-
     processed = 0
 
-    for run_dir in language_runs:
+    for run_dir in (
+        language_runs
+    ):
         (
             language_manifest,
             language_hash,
-        ) = load_language_manifest(
-            run_dir
+        ) = (
+            load_language_manifest(
+                run_dir
+            )
         )
 
         state = (
@@ -674,14 +850,17 @@ def arabic_variety_classification(
                 "classification_id"
             ],
             language_hash,
+            bundle.bundle_sha256,
         )
 
         if state in completed:
             print(
-                "Skipped existing Arabic "
-                "Variety Classification: "
+                "Skipped existing "
+                "Arabic Variety "
+                "Classification: "
                 f"{run_dir.name}"
             )
+
             continue
 
         manifest_path = (
@@ -689,15 +868,21 @@ def arabic_variety_classification(
                 language_dir=(
                     run_dir
                 ),
+
                 language_manifest=(
                     language_manifest
                 ),
+
                 language_manifest_sha256=(
                     language_hash
                 ),
+
+                bundle=bundle,
+
                 output_dir=(
                     output_dir
                 ),
+
                 workers=workers,
             )
         )
@@ -709,8 +894,14 @@ def arabic_variety_classification(
         processed += 1
 
         print(
-            "Arabic Variety Classification "
-            f"complete: {run_dir.name}"
+            "Arabic Variety "
+            "Classification complete: "
+            f"{run_dir.name}"
+        )
+
+        print(
+            f"Model bundle: "
+            f"{bundle.bundle_sha256}"
         )
 
         print(
@@ -720,6 +911,7 @@ def arabic_variety_classification(
 
     if processed == 0:
         print(
-            "No pending Language runs "
-            "for Arabic Variety Classification."
+            "No pending Language "
+            "runs for this model "
+            "bundle."
         )

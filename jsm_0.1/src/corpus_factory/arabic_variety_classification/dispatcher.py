@@ -8,6 +8,9 @@ from concurrent.futures import (
     wait,
 )
 
+from src.corpus_factory.arabic_variety_classification.modeling.predictor import (
+    InferenceBundle,
+)
 from src.corpus_factory.arabic_variety_classification.result import (
     VarietyResult,
     VarietyTask,
@@ -18,11 +21,16 @@ from src.corpus_factory.arabic_variety_classification.worker import (
 
 
 def dispatch(
-    tasks: Iterable[VarietyTask],
+    tasks: Iterable[
+        VarietyTask
+    ],
     *,
+    bundle: InferenceBundle,
     workers: int = 4,
     max_pending: int | None = None,
-) -> Iterator[VarietyResult]:
+) -> Iterator[
+    VarietyResult
+]:
     if workers <= 0:
         raise ValueError(
             "workers must be positive"
@@ -33,8 +41,13 @@ def dispatch(
             workers * 2
         )
 
-    if max_pending < workers:
-        max_pending = workers
+    if (
+        max_pending
+        < workers
+    ):
+        max_pending = (
+            workers
+        )
 
     iterator = iter(
         tasks
@@ -46,7 +59,9 @@ def dispatch(
         pending = set()
 
         while (
-            len(pending)
+            len(
+                pending
+            )
             < max_pending
         ):
             try:
@@ -61,11 +76,15 @@ def dispatch(
                 executor.submit(
                     process_task,
                     task,
+                    bundle,
                 )
             )
 
         while pending:
-            done, pending = wait(
+            (
+                done,
+                pending,
+            ) = wait(
                 pending,
                 return_when=(
                     FIRST_COMPLETED
@@ -73,7 +92,9 @@ def dispatch(
             )
 
             for future in done:
-                yield future.result()
+                yield (
+                    future.result()
+                )
 
                 try:
                     task = next(
@@ -87,5 +108,6 @@ def dispatch(
                     executor.submit(
                         process_task,
                         task,
+                        bundle,
                     )
                 )
