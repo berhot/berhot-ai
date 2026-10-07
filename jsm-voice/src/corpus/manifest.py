@@ -10,6 +10,7 @@ from pathlib import Path
 
 from src.audio.config import PROJECT_ROOT
 from src.audio.wav_reader import read_wav
+from src.artifacts import replace_artifact
 from src.corpus.models import AudioArtifact, SegmentRecord, VoiceManifest
 from src.vad.models import SegmentationResult
 
@@ -43,7 +44,7 @@ def write_manifest(path: Path, manifest: VoiceManifest) -> None:
             stream.write(payload.encode("utf-8"))
             stream.flush()
             os.fsync(stream.fileno())
-        os.replace(temporary_path, path)
+        replace_artifact(temporary_path, path)
     finally:
         if temporary_path is not None:
             temporary_path.unlink(missing_ok=True)

@@ -15,6 +15,8 @@ def main() -> None:
     parser.add_argument("--list-devices", action="store_true")
     parser.add_argument("--seconds", type=float)
     parser.add_argument("--max-turns", type=int)
+    parser.add_argument("--streaming", action="store_true")
+    parser.add_argument("--barge-in", action="store_true", help="Interrupt playback on speech; use headphones.")
     args = parser.parse_args()
     configure_logging()
     try:
@@ -30,7 +32,14 @@ def main() -> None:
             config = replace(config, recording_seconds=args.seconds)
         if args.max_turns is not None:
             config = replace(config, max_turns=args.max_turns)
-        run_voice_chat(build_voice_service(), config)
+        if args.barge_in and not args.streaming:
+            raise ValueError("--barge-in requires --streaming.")
+        if args.streaming:
+            from src.application.streaming_chat import run_streaming_chat
+            from src.streaming.config import load_streaming_config
+            run_streaming_chat(build_voice_service(), config, load_streaming_config(), args.barge_in)
+        else:
+            run_voice_chat(build_voice_service(), config)
     except (OSError, ValueError, RuntimeError, ImportError) as error:
         parser.exit(2, f"error: {error}\n")
 

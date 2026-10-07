@@ -1,5 +1,6 @@
 from pathlib import Path
 from uuid import uuid4
+from collections.abc import Callable
 
 import numpy as np
 
@@ -16,8 +17,13 @@ from src.streaming.vad import WebRTCStreamingVAD
 from src.timing import StageTimer
 
 
+class NoSpeechTimeout(ValueError):
+    pass
+
+
 def capture_utterance(config: StreamingConfig, devices: DeviceConfig,
-                      cancellation: CancellationToken | None = None) -> Utterance:
+                      cancellation: CancellationToken | None = None,
+                      on_speech_start: Callable[[], None] | None = None) -> Utterance:
     cancellation = cancellation if cancellation is not None else CancellationToken()
     cancellation.raise_if_cancelled()
     detector = TurnDetector(config, devices.sample_rate_hz)
@@ -27,11 +33,14 @@ def capture_utterance(config: StreamingConfig, devices: DeviceConfig,
             while True:
                 cancellation.raise_if_cancelled()
                 chunk = microphone.read()
+                previous_state = detector.state
                 utterance = detector.push(chunk, vad.is_speech(chunk))
+                if previous_state == TurnState.WAITING and detector.state != TurnState.WAITING and on_speech_start is not None:
+                    on_speech_start()
                 if utterance is not None:
                     return utterance
                 if detector.state == TurnState.WAITING and chunk.end_sample / devices.sample_rate_hz >= config.max_wait_seconds:
-                    raise ValueError("No sustained speech detected before the listening timeout.")
+                    raise NoSpeechTimeout("No sustained speech detected before the listening timeout.")
 
 
 def save_utterance(utterance: Utterance, directory: Path = PROJECT_ROOT / "storage/recordings") -> Path:
