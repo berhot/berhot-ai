@@ -25,6 +25,7 @@ def main() -> None:
           f"ASR={result.asr_latency_ms:.1f}, LLM={result.llm_latency_ms:.1f}, "
           f"TTS={result.tts_latency_ms:.1f}, total={result.total_latency_ms:.1f}")
     print(f"Turn result: {result.result_path}")
+    print("Stages (ms): " + ", ".join(f"{name}={value:.1f}" for name, value in result.stage_latencies_ms.items()))
 
 
 if __name__ == "__main__":

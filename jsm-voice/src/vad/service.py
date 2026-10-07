@@ -15,6 +15,7 @@ from src.vad.config import VADConfig, load_vad_config
 from src.vad.interface import VADBackend
 from src.vad.models import SegmentationResult, SpeechSegment
 from src.vad.segmentation import build_speech_regions
+from src.timing import StageTimer
 
 PROCESSING_VERSION = "segmentation-v1"
 
@@ -35,11 +36,13 @@ def segment_audio(
 ) -> SegmentationResult:
     config = config if config is not None else load_vad_config()
     backend = backend if backend is not None else create_vad_backend(config)
-    standardized = standardize_audio(path, audio_config)
+    with StageTimer("standardization"):
+        standardized = standardize_audio(path, audio_config)
     waveform = standardized.waveform
     metadata = waveform.metadata
-    decisions = backend.detect(waveform)
-    regions = build_speech_regions(decisions, metadata.sample_rate_hz, metadata.frame_count, config)
+    with StageTimer("vad"):
+        decisions = backend.detect(waveform)
+        regions = build_speech_regions(decisions, metadata.sample_rate_hz, metadata.frame_count, config)
     source_id = standardized.source_sha256
     source_path = standardized.source_metadata.path
     with metadata.path.open("rb") as audio_file:

@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 
@@ -17,3 +17,4 @@ class VoiceTurnResult:
     tts_latency_ms: float
     total_latency_ms: float
     result_path: Path
+    stage_latencies_ms: dict[str, float] = field(default_factory=dict)

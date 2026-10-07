@@ -1,7 +1,6 @@
 from collections.abc import Callable
 from dataclasses import asdict
 from pathlib import Path
-from uuid import uuid4
 
 from src.artifacts import write_json_artifact
 from src.asr.interface import ASRBackend
@@ -10,7 +9,7 @@ from src.audio.config import PROJECT_ROOT
 from src.corpus.models import VoiceManifest
 from src.llm.interface import TextModelBackend
 from src.llm.models import ConversationMessage
-from src.timing import StageTimer
+from src.timing import StageTimer, TurnMeasurements, measure_turn
 from src.tts.interface import TTSBackend
 from src.application.models import VoiceTurnResult
 
@@ -29,7 +28,11 @@ class VoiceTurnService:
         self.output_directory = output_directory
 
     def run(self, path: Path, history: tuple[ConversationMessage, ...] = ()) -> VoiceTurnResult:
-        turn_id = uuid4().hex
+        with measure_turn() as measurements:
+            return self._run(path, history, measurements)
+
+    def _run(self, path: Path, history: tuple[ConversationMessage, ...], measurements: TurnMeasurements) -> VoiceTurnResult:
+        turn_id = measurements.turn_id
         with StageTimer("total", turn_id) as total:
             with StageTimer("preprocessing", turn_id) as preprocessing:
                 manifest_path, manifest = self.preprocess(path)
@@ -49,6 +52,7 @@ class VoiceTurnService:
             response.text, speech.audio_path, preprocessing.duration_ms, asr.duration_ms,
             llm.duration_ms, tts.duration_ms, total.duration_ms,
             self.output_directory / f"{turn_id}.json",
+            dict(measurements.durations_ms),
         )
         document = {name: str(value) if isinstance(value, Path) else value for name, value in asdict(result).items()}
         write_json_artifact(result.result_path, document)
