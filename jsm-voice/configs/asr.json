@@ -1,0 +1,11 @@
+{
+  "backend": "faster_whisper",
+  "model": "small",
+  "model_directory": "artifacts/models/asr/small",
+  "device": "auto",
+  "compute_type": "auto",
+  "cpu_fallback": true,
+  "language": "ar",
+  "beam_size": 5,
+  "cpu_threads": 4
+}
