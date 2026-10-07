@@ -183,11 +183,6 @@ export function Chat() {
     textareaRef.current?.focus();
   }
 
-  function fillExample(text: string) {
-    setDraft(text);
-    textareaRef.current?.focus();
-  }
-
   return (
     <div className="flex h-dvh flex-col bg-ink text-paper">
       <header className="shrink-0 border-b border-line">
@@ -255,7 +250,6 @@ export function Chat() {
             <EmptyState
               state={modelsState}
               hasModel={selected !== null}
-              onExample={fillExample}
               onRetry={retry}
             />
           ) : (
