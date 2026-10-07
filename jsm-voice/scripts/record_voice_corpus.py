@@ -2,7 +2,10 @@
 
 import argparse
 import json
+import os
 import re
+import sys
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -36,14 +39,37 @@ def check_take(samples: np.ndarray) -> str | None:
     return None
 
 
-def record_take(device: int | str | None) -> np.ndarray:
-    import sounddevice as sd
+class Microphone:
+    """One input stream for the whole session.
 
-    blocks: list[np.ndarray] = []
-    with sd.InputStream(samplerate=SAMPLE_RATE_HZ, channels=1, dtype="int16", device=device,
-                        callback=lambda data, frames, time, status: blocks.append(data[:, 0].copy())):
+    Opening and closing a stream for every take can deadlock CoreAudio
+    while the stream stops, which froze the recorder between sentences.
+    """
+
+    def __init__(self, device: int | str | None) -> None:
+        import sounddevice as sd
+
+        self.blocks: list[np.ndarray] | None = None
+        self.stream = sd.InputStream(samplerate=SAMPLE_RATE_HZ, channels=1, dtype="int16", device=device, callback=self._collect)
+        self.stream.start()
+
+    def _collect(self, data, frames, time, status) -> None:
+        blocks = self.blocks
+        if blocks is not None:
+            blocks.append(data[:, 0].copy())
+
+    def take(self) -> np.ndarray:
+        self.blocks = []
         input("    recording... press Enter when you finish the sentence ")
-    return np.concatenate(blocks) if blocks else np.zeros(0, dtype=np.int16)
+        blocks, self.blocks = self.blocks, None
+        return np.concatenate(blocks) if blocks else np.zeros(0, dtype=np.int16)
+
+    def close(self) -> bool:
+        """Whether the stream closed; a stuck close must not keep the recordings' owner waiting."""
+        closing = threading.Thread(target=self.stream.close, daemon=True)
+        closing.start()
+        closing.join(2)
+        return not closing.is_alive()
 
 
 def main() -> None:
@@ -80,6 +106,7 @@ def main() -> None:
     print("Use a quiet room and keep the same distance from the microphone. Ctrl+C stops; progress is kept.\n")
     device = int(args.device) if args.device and args.device.isdigit() else args.device
     command = ""
+    microphone = Microphone(device)
     try:
         # A prompt's number is its line in the prompt list, so skipped prompts
         # never shift the file names of recordings made later.
@@ -91,7 +118,7 @@ def main() -> None:
                 command = input("    Enter to record, s to skip, q to quit: ").strip().lower()
                 if command in ("s", "q"):
                     break
-                samples = record_take(device)
+                samples = microphone.take()
                 problem = check_take(samples)
                 if problem:
                     print(f"    Not saved: {problem}. Try again.")
@@ -113,6 +140,10 @@ def main() -> None:
     count = len(metadata.read_text(encoding="utf-8").splitlines()) if metadata.is_file() else 0
     print(f"\n{count} recordings in {corpus}")
     print(f"Train with: python -m scripts.train_voice --speaker {args.speaker}")
+    if not microphone.close():
+        # Every recording is already on disk; leave without waiting for the audio system.
+        sys.stdout.flush()
+        os._exit(0)
 
 
 if __name__ == "__main__":
