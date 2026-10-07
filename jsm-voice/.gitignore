@@ -1,0 +1,6 @@
+# Audio, model downloads, and generated artifacts stay local.
+/storage/**
+!/storage/uploads/
+!/storage/uploads/.gitkeep
+/artifacts/**
+.pytest_cache/

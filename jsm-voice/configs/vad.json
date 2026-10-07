@@ -1,0 +1,10 @@
+{
+  "backend": "webrtc",
+  "aggressiveness": 1,
+  "frame_duration_ms": 30,
+  "min_speech_duration_ms": 200,
+  "min_silence_duration_ms": 500,
+  "padding_ms": 200,
+  "max_segment_duration_ms": 30000,
+  "output_directory": "storage/segments"
+}

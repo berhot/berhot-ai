@@ -1,0 +1,6 @@
+{
+  "target_sample_rate_hz": 16000,
+  "target_channels": 1,
+  "target_sample_width_bytes": 2,
+  "output_directory": "storage/standardized"
+}

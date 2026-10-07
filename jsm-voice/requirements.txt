@@ -1,0 +1,4 @@
+# Inspection uses the standard library; standardization uses these packages.
+numpy==2.5.3
+scipy==1.18.1
+webrtcvad-wheels==2.0.14.post1
