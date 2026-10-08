@@ -14,9 +14,8 @@ venv/
 jsm_0.1/storage/**
 !jsm_0.1/storage/.gitkeep
 
-# Keep test input files
-!jsm_0.1/storage/uploads/
-!jsm_0.1/storage/uploads/**
+# Upload files already in git stay tracked. New ones are kept in the
+# R2 bucket instead (scripts/r2_upload.py, scripts/r2_intake.py).
 
 # Generated model artifacts
 jsm_0.1/artifacts/**

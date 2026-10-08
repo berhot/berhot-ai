@@ -26,6 +26,36 @@
       "authority": "provenance_policy"
     },
 
+    "fineweb2-najdi": {
+      "training_use": "allowed",
+      "basis": "Hugging Face dataset Omartificial-Intelligence-Space/FineWeb2-Najdi-Arabic, published under ODC-By 1.0.",
+      "authority": "provenance_policy"
+    },
+
+    "saudi-dialect-rag": {
+      "training_use": "allowed",
+      "basis": "Hugging Face dataset Rabe3/saudi-dialect-rag, published under Apache-2.0.",
+      "authority": "provenance_policy"
+    },
+
+    "arabic-short-stories": {
+      "training_use": "allowed",
+      "basis": "Hugging Face dataset tahaalselwii/arabic-short-stories-collection-5k, published under CC BY 4.0.",
+      "authority": "provenance_policy"
+    },
+
+    "saudi-cs-conversations": {
+      "training_use": "allowed",
+      "basis": "Hugging Face dataset dev-hussein/saudi-arabic-cs-conversations, published under Apache-2.0.",
+      "authority": "provenance_policy"
+    },
+
+    "saudilang-code-switch": {
+      "training_use": "allowed",
+      "basis": "Hugging Face dataset SDAIANCAI/Saudilang-Code-Switch-Corpus, published under CC BY-SA 4.0.",
+      "authority": "provenance_policy"
+    },
+
     "aramco": {
       "training_use": "review_required",
       "basis": "Source requires explicit rights review.",

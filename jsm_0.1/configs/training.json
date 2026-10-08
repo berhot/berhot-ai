@@ -1,13 +1,14 @@
 {
-  "epochs": 12,
-  "max_training_minutes": 240,
+  "epochs": 2,
+  "max_training_minutes": 300,
   "early_stopping_patience": 3,
   "batch_size": 32,
-  "learning_rate": 0.0005,
+  "learning_rate": 0.0003,
   "warmup_steps": 200,
   "weight_decay": 0.1,
   "gradient_clip": 1.0,
   "resume": true,
+  "log_every_steps": 200,
   "checkpoint_every_epochs": 1,
   "keep_last_checkpoints": 1,
   "model": {
