@@ -1,6 +1,6 @@
 {
-  "backend": "piper",
-  "voice": "ar_JO-kareem-medium",
+  "backend": "jsm",
+  "voice": "fahd-test",
   "model_directory": "artifacts/models/tts",
   "output_directory": "storage/generated",
   "device": "cpu",
