@@ -1,3 +1,5 @@
+import argparse
+from pathlib import Path
 import json
 import os
 
@@ -14,10 +16,10 @@ TOKENIZED_DIR = TRAINING_DATA_DIR / "tokenized"
 tokenizer = None
 
 
-def load_tokenizer() -> None:
+def load_tokenizer(path: Path = TOKENIZER_PATH) -> None:
     global tokenizer
 
-    tokenizer = Tokenizer.load(TOKENIZER_PATH)
+    tokenizer = Tokenizer.load(path)
 
 
 def tokenize(
@@ -77,6 +79,15 @@ def previous_lines(path) -> dict[str, str]:
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Tokenize with a fixed tokenizer and bounded worker count.")
+    parser.add_argument("--workers", type=int, default=min(max((os.cpu_count() or 2) - 2, 1), 8))
+    parser.add_argument("--dataset", type=Path, default=DATASET_DIR)
+    parser.add_argument("--output", type=Path, default=TOKENIZED_DIR)
+    parser.add_argument("--tokenizer", type=Path, default=TOKENIZER_PATH)
+    args = parser.parse_args()
+    if args.workers < 1:
+        parser.error("--workers must be positive")
+    DATASET_DIR, TOKENIZED_DIR = args.dataset, args.output
     TOKENIZED_DIR.mkdir(
         parents=True,
         exist_ok=True,
@@ -85,8 +96,9 @@ if __name__ == "__main__":
     # Encoding is the slow step, so documents are encoded in
     # parallel and unchanged documents are not encoded again.
     with Pool(
-        processes=max((os.cpu_count() or 2) - 2, 1),
+        processes=args.workers,
         initializer=load_tokenizer,
+        initargs=(args.tokenizer,),
     ) as pool:
         for split in (
             "train",

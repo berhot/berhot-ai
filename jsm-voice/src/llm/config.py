@@ -13,7 +13,7 @@ DEFAULT_LLM_CONFIG_PATH = PROJECT_ROOT / "configs/llm.json"
 class TextModelConfig:
     backend: str = "jsm_http"
     base_url: str = "http://127.0.0.1:8000"
-    model: str = "tiny_model.pt"
+    model: str = "best_jsm_small.pt"
     max_new_tokens: int = 100
     temperature: float = 0.0
     timeout_seconds: float = 60.0

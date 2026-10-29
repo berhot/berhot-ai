@@ -1,7 +1,6 @@
-import math
-
 import torch
 from torch import nn
+from torch.nn import functional as F
 
 from src.model.config import ModelConfig
 
@@ -80,35 +79,11 @@ class CausalSelfAttention(nn.Module):
             self.head_dim,
         ).transpose(1, 2)
 
-        scores = (
-            q @ k.transpose(-2, -1)
-        ) / math.sqrt(self.head_dim)
-
-        causal_mask = torch.triu(
-            torch.ones(
-                sequence_length,
-                sequence_length,
-                device=x.device,
-                dtype=torch.bool,
-            ),
-            diagonal=1,
+        output = F.scaled_dot_product_attention(
+            q, k, v,
+            dropout_p=self.dropout.p if self.training else 0.0,
+            is_causal=True,
         )
-
-        scores = scores.masked_fill(
-            causal_mask,
-            float("-inf"),
-        )
-
-        attention_weights = torch.softmax(
-            scores,
-            dim=-1,
-        )
-
-        attention_weights = self.dropout(
-            attention_weights
-        )
-
-        output = attention_weights @ v
 
         output = output.transpose(
             1,

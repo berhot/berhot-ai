@@ -18,10 +18,11 @@ def evaluate(
 ) -> dict:
     model.eval()
 
-    loss_function = nn.CrossEntropyLoss()
+    loss_function = nn.CrossEntropyLoss(reduction="sum")
 
     total_loss = 0.0
     steps = 0
+    targets = 0
 
     for x, y in make_training_examples(
         path=dataset_path,
@@ -39,6 +40,7 @@ def evaluate(
 
         total_loss += loss.item()
         steps += 1
+        targets += y.numel()
 
     if steps == 0:
         return {
@@ -48,11 +50,11 @@ def evaluate(
             "steps": 0,
         }
 
-    average_loss = total_loss / steps
+    average_loss = total_loss / targets
 
     return {
         "available": True,
         "loss": average_loss,
-        "perplexity": math.exp(average_loss),
+        "perplexity": math.exp(min(average_loss, 700)),
         "steps": steps,
     }

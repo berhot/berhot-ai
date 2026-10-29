@@ -1,3 +1,7 @@
+Training commands below the corpus pipeline have changed. Use the current
+[GPU training runbook](../../docs/GPU_TRAINING.md) for preparation, explicit
+initialization/resume, evaluation, and GPU configuration.
+
 corpus files in Cloudflare R2 (copy .env.example to .env and fill in the bucket keys):
 python -m scripts.r2_upload            copy storage/uploads and storage/staged to the bucket
 python -m scripts.r2_intake            fetch uploads/ from the bucket, then run intake
@@ -19,9 +23,6 @@ python3 -m scripts.raw_exact_deduplication
 python3 -m scripts.extraction
 
 python3 -m scripts.cleaning
-python3 -m scripts.normalization
-python3 -m scripts.filtering
-python3 -m scripts.deduplication
 
 python3 -m scripts.language_classification
 python3 -m scripts.arabic_variety_classification
@@ -35,12 +36,12 @@ python -c "from paths import TOKENIZER_PATH; from src.tokenization.tokenizer imp
 
 python -m scripts.tokenize_dataset
 
-python -m scripts.train
+python -m scripts.train --help
 
 python -m scripts.inference "علي حسن"
 python -m scripts.inference "مشروع"
 
-python -m scripts.evaluate
+python -m scripts.evaluate --help
 
 web apps (build once, and again after changing anything under apps/):
 cd apps && npm install && npm run build

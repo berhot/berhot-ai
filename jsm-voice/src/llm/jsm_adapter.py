@@ -25,16 +25,15 @@ class JSMTextModelBackend:
     ) -> TextGenerationResult:
         if not isinstance(transcript, str) or not transcript.strip():
             raise ValueError("Text generation requires a nonempty transcript.")
-        prompt = transcript.strip()
-        if history:
-            prompt = "\n".join(f"{message.role}: {message.text}" for message in history)
-            prompt += f"\nuser: {transcript.strip()}\nassistant:"
+        # Match the web chat and newline-separated dialogue training format.
+        prompt = "\n".join([*(" ".join(message.text.split()) for message in history),
+                              " ".join(transcript.split())])
         request = Request(
             self.config.base_url.rstrip("/") + "/generate",
             data=json.dumps({
                 "prompt": prompt, "model": self.config.model,
                 "max_new_tokens": self.config.max_new_tokens,
-                "temperature": self.config.temperature,
+                "temperature": self.config.temperature, "reply": True,
             }, ensure_ascii=False).encode("utf-8"),
             headers={"Content-Type": "application/json"}, method="POST",
         )

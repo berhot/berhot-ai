@@ -25,14 +25,15 @@ def test_generation_strips_echo_and_preserves_arabic() -> None:
     backend._opener = Opener()
     response = backend.generate("السلام عليكم")
     assert response.text == "مرحبا بك"
-    assert response.model == "tiny_model.pt" and response.latency_ms >= 0
+    assert response.model == "best_jsm_small.pt" and response.latency_ms >= 0
 
 
 def test_history_reaches_backend_without_becoming_response() -> None:
     backend = JSMTextModelBackend(TextModelConfig())
     backend._opener = Opener()
     response = backend.generate("شكرا", (ConversationMessage("user", "مرحبا"),))
-    assert "user: مرحبا" in backend._opener.requests[0]["prompt"]
+    assert backend._opener.requests[0]["prompt"] == "مرحبا\nشكرا"
+    assert backend._opener.requests[0]["reply"] is True
     assert response.text == "مرحبا بك"
 
 

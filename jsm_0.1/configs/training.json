@@ -1,16 +1,13 @@
 {
   "epochs": 2,
-  "max_training_minutes": 300,
-  "early_stopping_patience": 3,
+  "max_training_minutes": null,
+  "early_stopping_patience": null,
   "batch_size": 32,
   "learning_rate": 0.0003,
   "warmup_steps": 200,
   "weight_decay": 0.1,
   "gradient_clip": 1.0,
-  "resume": true,
-  "log_every_steps": 200,
-  "checkpoint_every_epochs": 1,
-  "keep_last_checkpoints": 1,
+  "log_every_steps": 20,
   "model": {
     "vocab_size": 2000,
     "context_length": 256,
@@ -18,5 +15,12 @@
     "num_heads": 6,
     "num_layers": 6,
     "dropout": 0.1
-  }
+  },
+  "gradient_accumulation_steps": 1,
+  "precision": "auto",
+  "device": "auto",
+  "seed": 42,
+  "checkpoint_every_steps": 100,
+  "eval_every_steps": 500,
+  "eval_batch_size": 32
 }

@@ -1,4 +1,5 @@
 import re
+import hashlib
 import threading
 from collections import OrderedDict
 from pathlib import Path
@@ -154,7 +155,7 @@ class ModelManager:
         try:
             ModelConfig(**checkpoint["config"])
 
-        except TypeError as error:
+        except (TypeError, ValueError) as error:
             raise ModelLoadError(
                 f"{path.name} has an incompatible "
                 f"model config: {error}"
@@ -388,7 +389,7 @@ class ModelManager:
             if path is None:
                 raise UnknownModelError(model_id)
 
-            signature = self._signature(path)
+            signature = (self._signature(path), self._signature(self.tokenizer_path) if self.tokenizer_path.is_file() else None)
 
             cached = self._loaded.get(model_id)
 
@@ -401,6 +402,13 @@ class ModelManager:
 
             try:
                 checkpoint = self._read_checkpoint(path)
+
+                expected = checkpoint.get("tokenizer_sha256")
+                if expected:
+                    with self.tokenizer_path.open("rb") as stream:
+                        actual = hashlib.file_digest(stream, "sha256").hexdigest()
+                    if actual != expected:
+                        raise ModelLoadError("Checkpoint tokenizer hash does not match the serving tokenizer.")
 
                 config = ModelConfig(
                     **checkpoint["config"]

@@ -10,6 +10,11 @@ temporary artifact directories and delete them after processing. See the
 browser recording, deployment boundaries, and tests. The CLI behavior below is
 unchanged.
 
+For configurable GPU training, resumable checkpoints, dataset transfer and quality
+evaluation, see the [GPU training runbook](../docs/GPU_TRAINING.md). The active
+local TTS configuration selects the experimental `fahd-test` voice. The CLI text
+backend now selects `best_jsm_small.pt` and shares web chat's newline/reply format.
+
 ## Setup
 
 Run commands from `jsm-voice` with its Python environment active. This implementation was validated with Python 3.14 on Windows.
@@ -56,9 +61,12 @@ python -m scripts.train_voice --speaker faris --minutes 120
 
 `record_voice_corpus` shows one sentence at a time from `data/voice_prompts/saudi.txt` (800 Saudi sentences, about an hour of speech, taken from the Apache-2.0 dataset `VohoAI/voho-saudi-dialogues`). It records at 22,050 Hz, rejects takes that are clipped, too quiet, or too short, and keeps progress between sessions in `storage/voice_corpus/<speaker>/`. Record only a speaker who has agreed to it; `--consent` records that statement in `speaker.json`.
 
-`train_voice` writes `artifacts/models/tts/jsm-saudi.pt` and continues from where it stopped when run again. To speak with it, set `"backend": "jsm"` and `"voice": "jsm-saudi"` in `configs/tts.json`. Twenty recordings are the minimum to train at all; a clear voice needs several hundred and a few hours of training. Griffin-Lim gives an understandable but slightly metallic sound; a trained vocoder is the next step for a natural one.
+`train_voice` writes `artifacts/models/tts/jsm-saudi.pt` and resumes compatible new-format
+training state when run again. Legacy voices require `--init-from` and a new voice
+name; see the GPU runbook. To speak with it, set `"backend": "jsm"` and `"voice": "jsm-saudi"` in `configs/tts.json`. Twenty recordings are the minimum to train at all; a clear voice needs several hundred and a few hours of training. Griffin-Lim gives an understandable but slightly metallic sound; a trained vocoder is the next step for a natural one.
 
-Until an own voice is trained, the default backend is Piper's `ar_JO-kareem-medium`, a third-party Jordanian voice. Whisper speech recognition is also a third-party model.
+Piper's `ar_JO-kareem-medium` remains an optional third-party Jordanian backend;
+the checked-in configuration currently selects the local `fahd-test` voice. Whisper speech recognition is also a third-party model.
 
 Every backend speaks through `src/tts/prosody.py`, which belongs to this project: it speaks one sentence at a time, sets the pause after each by its punctuation, splits a long unpunctuated reply at a joining word, and adds a quiet generated breath after about five seconds of speech. `"natural_pauses": false` turns this off for Piper. Piper's `noise_scale` and `noise_w_scale` control how much its pitch and timing vary.
 

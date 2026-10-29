@@ -1,0 +1,3 @@
+# Training only: ASR, Piper, microphone libraries and web apps are not required.
+-r ../jsm_0.1/requirements-training.txt
+scipy==1.18.1

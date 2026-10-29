@@ -9,19 +9,19 @@ import torch
 from src.tts.jsm.audio import AudioSettings, griffin_lim
 from src.tts.jsm.model import VoiceModel, VoiceModelConfig
 from src.tts.jsm.text import SYMBOLS, encode
+from src.training_runtime import atomic_save
 
 # Log-mel values are shifted and scaled to roughly unit range for the model.
 MEL_SHIFT, MEL_SCALE = -5.0, 2.5
 
 
-def save_voice(path: Path, model: VoiceModel, settings: AudioSettings, stats: dict, optimizer_state: dict | None = None) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_suffix(path.suffix + ".tmp")
-    torch.save({
+def save_voice(path: Path, model: VoiceModel, settings: AudioSettings, stats: dict,
+               optimizer_state: dict | None = None, training_state: dict | None = None) -> None:
+    atomic_save(path, {
         "schema_version": 1, "model": model.state_dict(), "config": model.config.to_dict(),
-        "audio": asdict(settings), "symbols": list(SYMBOLS), "stats": stats, "optimizer": optimizer_state,
-    }, temporary)
-    temporary.replace(path)
+        "audio": asdict(settings), "symbols": list(SYMBOLS), "stats": stats,
+        "optimizer": optimizer_state, "training_state": training_state,
+    })
 
 
 def load_voice(path: Path, device: str = "cpu") -> tuple[VoiceModel, AudioSettings, dict]:

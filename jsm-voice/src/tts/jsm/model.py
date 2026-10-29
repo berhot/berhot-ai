@@ -140,9 +140,11 @@ class VoiceModel(nn.Module):
         sounds = self.letter_sound(letters)
         with torch.no_grad():
             # Squared distance between every letter's sound and every frame.
-            score = -0.5 * (
-                (sounds ** 2).sum(-1)[:, :, None] - 2 * sounds @ mel.transpose(1, 2) + (mel ** 2).sum(-1)[:, None, :]
-            ).cpu().numpy()
+            # Alignment runs in float32 even when the neural layers use AMP.
+            with torch.autocast(device_type=mel.device.type, enabled=False):
+                score = -0.5 * (
+                    (sounds.float() ** 2).sum(-1)[:, :, None] - 2 * sounds.float() @ mel.float().transpose(1, 2) + (mel.float() ** 2).sum(-1)[:, None, :]
+                ).cpu().numpy()
             durations = torch.zeros_like(ids)
             for row in range(ids.shape[0]):
                 found = align(score[row, :lengths[row], :frames[row]])

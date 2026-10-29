@@ -28,3 +28,7 @@ jsm_0.1/artifacts/**
 !jsm_0.1/artifacts/checkpoints/best_jsm_small.pt
 !jsm_0.1/artifacts/tokenizer/
 !jsm_0.1/artifacts/tokenizer/tokenizer.json
+# Portable training bundles / machine-specific environment records
+training-bundles/
+training-environment.txt
+training-bundle.json

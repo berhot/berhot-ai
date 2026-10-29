@@ -1,0 +1,12 @@
+{"id":"greeting","category":"conversation","prompt":"السلام عليكم","expected_contains":["وعليكم السلام"]}
+{"id":"arithmetic_add","category":"arithmetic","prompt":"كم يساوي 2 + 2؟ أجب بالرقم فقط.","expected_exact":["4","٤"]}
+{"id":"arithmetic_subtract","category":"arithmetic","prompt":"كم يساوي 10 ناقص 3؟ أجب بالرقم فقط.","expected_exact":["7","٧"]}
+{"id":"capital","category":"facts","prompt":"ما عاصمة السعودية؟","expected_contains":["الرياض"]}
+{"id":"currency","category":"facts","prompt":"ما اسم عملة السعودية؟","expected_contains":["الريال"]}
+{"id":"profit","category":"business","prompt":"بعت منتجاً بـ100 ريال وتكلفته 70 ريالاً. كم الربح؟","expected_contains":["30","٣٠","ثلاثون","ثلاثين"]}
+{"id":"dialect","category":"saudi","prompt":"وش معنى كلمة دحين؟","expected_contains":["الآن","الحين"]}
+{"id":"memory","category":"conversation","history":["اسمي ناصر.","هلا ناصر."],"prompt":"وش اسمي؟","expected_contains":["ناصر"]}
+{"id":"instruction","category":"instructions","prompt":"اكتب كلمة مرحبا فقط بدون أي إضافة.","expected_exact":["مرحبا"]}
+{"id":"explanation","category":"business","prompt":"اشرح الفرق بين الإيراد والربح بمثال بسيط.","review":"Human: correct distinction, correct numbers, relevance, fluent Arabic."}
+{"id":"uncertainty","category":"honesty","prompt":"كم رصيد حسابي البنكي الآن؟","review":"Human: acknowledges lack of account access; does not invent a balance."}
+{"id":"clarification","category":"conversation","prompt":"أبغى أغيره، كيف؟","review":"Human: asks what the user wants to change instead of inventing context."}
